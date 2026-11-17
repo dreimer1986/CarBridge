@@ -20,7 +20,6 @@ import org.carbridge.core.CarOptions
 import org.carbridge.patch.BackupFailure
 import org.carbridge.patch.KeyBackup
 import org.carbridge.patch.KeystoreSigner
-import org.carbridge.patch.PatchFailure
 import org.carbridge.patch.PatchPipeline
 
 private const val TAG = "CarBridge"
@@ -311,11 +310,7 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
         prefs.edit().putBoolean("show_auto_apps", showAutoApps).apply()
     }
 
-    /** Per-app choices; by default copies fill the screen and drop media services. */
-    private fun carOptions(originalPackage: String) = CarOptions(
-        keepMediaServices = prefs.getBoolean("keep_media:$originalPackage", false),
-        fillScreen = !prefs.getBoolean("keep_portrait:$originalPackage", false),
-    )
+    private fun carOptions(originalPackage: String) = CopyBuilder.options(getApplication(), originalPackage)
 
     /** Saves the layout choice and rebuilds the copy with it. */
     fun setFillScreen(copy: CarCopy, fill: Boolean) {
@@ -352,26 +347,24 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
         log.clear()
         job = Job(source.label, source.icon, carPackage, update, JobStep.Read.ordinal)
         viewModelScope.launch {
-            try {
-                val apks = withContext(Dispatchers.IO) {
-                    PatchPipeline(context) { line -> onLog(line) }.patch(source.info, carOptions(source.info.packageName))
+            val started = try {
+                withContext(Dispatchers.IO) {
+                    CopyBuilder.build(context, source.info, ::onLog) {
+                        viewModelScope.launch { job = job?.copy(step = JobStep.Confirm.ordinal) }
+                    }
                 }
-                job = job?.copy(step = JobStep.Confirm.ordinal)
-                withContext(Dispatchers.IO) { Installer.install(context, apks, carPackage) }
             } catch (e: Throwable) {
                 // Throwable: apksig/ARSCLib can throw Errors (e.g. missing JDK classes on Android)
                 Log.e(TAG, "patch failed", e)
                 job = null
                 nextQueued(continueRun = false)
-                val reason = when (e) {
-                    is PatchFailure -> e.message
-                    is OutOfMemoryError -> "The app is too large to patch in the memory available. Close other apps and try again."
-                    else -> "${e.javaClass.simpleName}: ${e.message}"
-                }
-                _messages.send(UserMessage("Couldn't add ${source.label}.", details(reason)))
-            } finally {
-                // The install session holds its own copy once committed
-                withContext(Dispatchers.IO) { PatchPipeline.clearWork(context) }
+                _messages.send(UserMessage("Couldn't add ${source.label}.", details(CopyBuilder.describe(e))))
+                return@launch
+            }
+            if (!started) {
+                job = null
+                nextQueued(continueRun = false)
+                _messages.send(UserMessage("CarBridge is updating another copy in the background. Try again in a minute."))
             }
         }
     }
