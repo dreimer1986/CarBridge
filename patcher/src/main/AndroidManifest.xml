@@ -38,6 +38,10 @@
             android:name=".InstallStatusReceiver"
             android:exported="false" />
 
+        <receiver
+            android:name=".AutoUpdateOptInReceiver"
+            android:exported="false" />
+
         <service
             android:name=".PatchService"
             android:exported="false"

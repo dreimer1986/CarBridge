@@ -53,6 +53,8 @@ data class CarCopy(
     val signedElsewhere: Boolean = false,
     /** Made by another CarBridge build still on the phone, e.g. CarBridge Dev, so no key was lost. */
     val madeByOtherCarBridge: Boolean = false,
+    /** The user hasn't opted this copy out of automatic updates. */
+    val autoUpdateAllowed: Boolean = true,
 ) {
     /** A key backup could make this copy updatable again. */
     val needsRestore get() = signedElsewhere && !madeByOtherCarBridge
@@ -117,6 +119,7 @@ object AppCatalog {
                 portraitLocked = original != null && locksPortrait(pm, originalPkg),
                 hasMediaService = original != null && hasMediaService(pm, originalPkg),
                 options = options(originalPkg),
+                autoUpdateAllowed = AutoUpdate.isAllowed(context, originalPkg),
                 signedElsewhere = !signer.canUpdate(pm, info.packageName),
                 madeByOtherCarBridge = installer(pm, info.packageName).let { by ->
                     by != null && by != context.packageName && (by == CARBRIDGE_ID || by.startsWith("$CARBRIDGE_ID.")) && isInstalled(pm, by)

@@ -70,6 +70,12 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
         private set
     var showAutoApps by mutableStateOf(prefs.getBoolean("show_auto_apps", false))
         private set
+    var autoUpdate by mutableStateOf(AutoUpdate.isEnabled(app))
+        private set
+
+    /** The label of a copy the background job is rebuilding, or null. */
+    var backgroundBuild by mutableStateOf<String?>(null)
+        private set
 
     private val _messages = Channel<UserMessage>(Channel.BUFFERED)
     val messages = _messages.receiveAsFlow()
@@ -85,6 +91,15 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
     val notificationPrompt = _notificationPrompt.receiveAsFlow()
 
     init {
+        viewModelScope.launch {
+            CopyBuilder.building.collect { pkg ->
+                // The screen's own builds already show their progress
+                val background = pkg?.takeIf { job?.packageName != it }
+                val finished = backgroundBuild != null && background == null
+                backgroundBuild = background?.let { withContext(Dispatchers.IO) { AutoUpdate.labelOf(app, it) } }
+                if (finished) refresh()
+            }
+        }
         viewModelScope.launch {
             // queued stays above 0 between copies of an Update all run, so the service keeps running
             snapshotFlow { job to queued }.collect { (current, waiting) ->
@@ -305,6 +320,19 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
         restoreDeclined = true
     }
 
+    fun switchAutoUpdate(on: Boolean) {
+        AutoUpdate.setEnabled(getApplication(), on)
+        autoUpdate = on
+        // Hands copies that are already outdated to the job right away
+        if (on) viewModelScope.launch(Dispatchers.IO) { UpdateCheck.run(getApplication()) }
+    }
+
+    fun setAutoUpdateAllowed(copy: CarCopy, allowed: Boolean) {
+        val original = copy.original ?: return
+        AutoUpdate.setAllowed(getApplication(), original.info.packageName, allowed)
+        refresh()
+    }
+
     fun toggleAutoApps() {
         showAutoApps = !showAutoApps
         prefs.edit().putBoolean("show_auto_apps", showAutoApps).apply()
@@ -341,7 +369,7 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
     )
 
     fun add(source: SourceApp, update: Boolean) {
-        if (job != null) return
+        if (job != null || backgroundBuild != null) return
         val context = getApplication<Application>()
         val carPackage = PatchPipeline.carPackageName(source.info.packageName)
         log.clear()

@@ -9,6 +9,7 @@ import android.app.job.JobInfo
 import android.app.job.JobParameters
 import android.app.job.JobScheduler
 import android.app.job.JobService
+import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -121,7 +122,7 @@ object UpdateCheck {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
         val updateLabel = if (outdated.size == 1) "Update" else "Update all"
-        val notification = Notification.Builder(context, CHANNEL)
+        val builder = Notification.Builder(context, CHANNEL)
             .addAction(Notification.Action.Builder(null, updateLabel, update).build())
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
@@ -129,7 +130,14 @@ object UpdateCheck {
             .setStyle(Notification.BigTextStyle().bigText(text))
             .setContentIntent(open)
             .setAutoCancel(true)
-            .build()
+        val notification = builder.apply {
+            if (!AutoUpdate.isEnabled(context)) {
+                val optIn = PendingIntent.getBroadcast(
+                    context, 4, Intent(context, AutoUpdateOptInReceiver::class.java), PendingIntent.FLAG_IMMUTABLE,
+                )
+                addAction(Notification.Action.Builder(null, "Always update automatically", optIn).build())
+            }
+        }.build()
         manager.notify(NOTIFICATION_ID, notification)
         return true
     }
@@ -145,4 +153,13 @@ class UpdateCheckService : JobService() {
     }
 
     override fun onStopJob(params: JobParameters) = true
+}
+
+/** The update notice's "Always update automatically" button. */
+class AutoUpdateOptInReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        AutoUpdate.setEnabled(context, true)
+        UpdateCheck.dismiss(context)
+        AutoUpdate.notifyResult(context, "Automatic updates are on", "Car copies will update while your phone charges.")
+    }
 }

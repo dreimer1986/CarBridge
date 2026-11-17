@@ -183,7 +183,7 @@ fun HomeScreen(model: HomeModel, actions: HomeActions) {
     val catalog = model.catalog
     val job = model.job
     val setup = model.setup
-    val busy = job != null
+    val busy = job != null || model.backgroundBuild != null
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
 
@@ -204,8 +204,11 @@ fun HomeScreen(model: HomeModel, actions: HomeActions) {
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
         bottomBar = {
-            AnimatedVisibility(job != null, enter = slideInVertically { it }, exit = slideOutVertically { it }) {
-                job?.let { JobBar(it, waiting = (model.queued - 1).coerceAtLeast(0)) }
+            AnimatedVisibility(busy, enter = slideInVertically { it }, exit = slideOutVertically { it }) {
+                when {
+                    job != null -> JobBar(job, waiting = (model.queued - 1).coerceAtLeast(0))
+                    model.backgroundBuild != null -> BackgroundBar(model.backgroundBuild!!)
+                }
             }
         },
         contentWindowInsets = WindowInsets(0),
@@ -274,6 +277,7 @@ fun HomeScreen(model: HomeModel, actions: HomeActions) {
                             onOpen = { actions.open(copy) },
                             onFillScreen = { fill -> actions.setFillScreen(copy, fill) },
                             onKeepMedia = { keep -> actions.setKeepMedia(copy, keep) },
+                            onAutoUpdate = if (model.autoUpdate) ({ allowed -> model.setAutoUpdateAllowed(copy, allowed) }) else null,
                         )
                     }
                     }
@@ -386,6 +390,8 @@ fun HomeScreen(model: HomeModel, actions: HomeActions) {
     if (showAbout) {
         ModalBottomSheet(onDismissRequest = { showAbout = false }) {
             About(
+                autoUpdate = model.autoUpdate,
+                onAutoUpdate = model::switchAutoUpdate,
                 onBackUp = { showAbout = false; model.startBackup() },
                 onRestore = { showAbout = false; actions.pickBackup() },
             )
@@ -606,6 +612,8 @@ private fun CarSign(
     onOpen: () -> Unit,
     onFillScreen: (Boolean) -> Unit,
     onKeepMedia: (Boolean) -> Unit,
+    /** Null while automatic updates are off for every copy. */
+    onAutoUpdate: ((Boolean) -> Unit)?,
 ) {
     val signs = LocalSigns.current
     var menu by remember { mutableStateOf(false) }
@@ -677,6 +685,14 @@ private fun CarSign(
                                 text = { Text(if (keep) "Always show the full app" else "Use Android Auto's audio player") },
                                 leadingIcon = { Icon(Icons.Rounded.PlayArrow, contentDescription = null) },
                                 onClick = { menu = false; onKeepMedia(!keep) },
+                            )
+                        }
+                        if (copy.updatable && onAutoUpdate != null) {
+                            val allowed = copy.autoUpdateAllowed
+                            DropdownMenuItem(
+                                text = { Text(if (allowed) "Don't update automatically" else "Update automatically") },
+                                leadingIcon = { Icon(Icons.Rounded.Refresh, contentDescription = null) },
+                                onClick = { menu = false; onAutoUpdate(!allowed) },
                             )
                         }
                         DropdownMenuItem(
@@ -935,6 +951,29 @@ private fun JobBar(job: Job, waiting: Int) {
     }
 }
 
+@Composable
+private fun BackgroundBar(label: String) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        shadowElevation = 8.dp,
+    ) {
+        Row(
+            Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 20.dp, vertical = 18.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 3.dp)
+            Spacer(Modifier.width(14.dp))
+            Text(
+                "Updating $label's car copy in the background",
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
 /** Progress drawn as lane markings: finished dashes solid, the current one pulsing. */
 @Composable
 private fun LaneProgress(current: Int, total: Int, modifier: Modifier = Modifier) {
@@ -962,7 +1001,7 @@ private fun LaneProgress(current: Int, total: Int, modifier: Modifier = Modifier
 }
 
 @Composable
-private fun About(onBackUp: () -> Unit, onRestore: () -> Unit) {
+private fun About(autoUpdate: Boolean, onAutoUpdate: (Boolean) -> Unit, onBackUp: () -> Unit, onRestore: () -> Unit) {
     Column(
         Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
             .padding(start = 24.dp, end = 24.dp, bottom = 32.dp),
@@ -978,6 +1017,19 @@ private fun About(onBackUp: () -> Unit, onRestore: () -> Unit) {
             "Some apps won't open",
             "Apps that check their own signature, a license or Play Integrity may refuse to run as a copy.",
         )
+        Row(
+            Modifier.fillMaxWidth().toggleable(value = autoUpdate, role = Role.Switch, onValueChange = onAutoUpdate),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                AboutItem(
+                    "Update copies automatically",
+                    "When an app updates, CarBridge updates its car copy the next time your phone charges.",
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            Switch(checked = autoUpdate, onCheckedChange = null)
+        }
         Column {
             AboutItem(
                 "Back up your key",
