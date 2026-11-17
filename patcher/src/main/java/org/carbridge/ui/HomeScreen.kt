@@ -626,7 +626,7 @@ private fun CarSign(
                             when {
                                 copy.original == null -> "Original removed"
                                 copy.madeByOtherCarBridge -> "Made by another CarBridge app"
-                                copy.signedElsewhere -> "To update, restore your key or add it again"
+                                copy.signedElsewhere -> "Restore your key to update it"
                                 copy.outdated -> "${versionText(copy.version!!, copy.originalVersion!!)} → " +
                                     versionText(copy.originalVersion, copy.version)
                                 else -> copy.version?.name ?: "In Android Auto"
