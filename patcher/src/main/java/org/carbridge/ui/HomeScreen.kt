@@ -117,7 +117,6 @@ class HomeActions(
     val setFillScreen: (CarCopy, Boolean) -> Unit,
     val setKeepMedia: (CarCopy, Boolean) -> Unit,
     val remove: (CarCopy) -> Unit,
-    val report: (CarCopy) -> Unit,
 )
 
 private val SignShape = RoundedCornerShape(20.dp)
@@ -194,7 +193,6 @@ fun HomeScreen(model: HomeModel, actions: HomeActions) {
                             busy,
                             onUpdate = { actions.update(copy) },
                             onRemove = { actions.remove(copy) },
-                            onReport = { actions.report(copy) },
                             onFillScreen = { fill -> actions.setFillScreen(copy, fill) },
                             onKeepMedia = { keep -> actions.setKeepMedia(copy, keep) },
                         )
@@ -468,7 +466,6 @@ private fun CarSign(
     busy: Boolean,
     onUpdate: () -> Unit,
     onRemove: () -> Unit,
-    onReport: () -> Unit,
     onFillScreen: (Boolean) -> Unit,
     onKeepMedia: (Boolean) -> Unit,
 ) {
@@ -532,11 +529,6 @@ private fun CarSign(
                                 onClick = { menu = false; onKeepMedia(!keep) },
                             )
                         }
-                        DropdownMenuItem(
-                            text = { Text("Report how it works") },
-                            leadingIcon = { Icon(Icons.Rounded.Info, contentDescription = null) },
-                            onClick = { menu = false; onReport() },
-                        )
                         DropdownMenuItem(
                             text = { Text("Remove from car") },
                             leadingIcon = { Icon(Icons.Rounded.Delete, contentDescription = null) },

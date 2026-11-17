@@ -31,7 +31,7 @@ class ScreenshotActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val model = ViewModelProvider(this)[HomeModel::class.java]
         model.showSample(sampleCatalog())
-        val none = HomeActions({}, {}, {}, {}, {}, {}, {}, {}, { _, _ -> }, { _, _ -> }, {}, {})
+        val none = HomeActions({}, {}, {}, {}, {}, {}, {}, {}, { _, _ -> }, { _, _ -> }, {})
         setContent { CarBridgeTheme { HomeScreen(model, none) } }
     }
 
