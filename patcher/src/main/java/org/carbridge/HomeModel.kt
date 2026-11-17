@@ -338,12 +338,15 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
             catalog = loaded
             backedUp = true
             val fixed = lostBefore - loaded.copies.count { it.needsRestore }
+            // Restoring this phone's own backup fixes nothing but still covers its copies
+            val covered = loaded.copies.count { !it.signedElsewhere }
             _messages.send(
                 UserMessage(
-                    when (fixed) {
-                        0 -> "Key restored. It doesn't match any copy on this phone, but it will sign new ones."
-                        1 -> "Key restored. 1 copy can update again."
-                        else -> "Key restored. $fixed copies can update again."
+                    when {
+                        fixed == 1 -> "Key restored. 1 copy can update again."
+                        fixed > 1 -> "Key restored. $fixed copies can update again."
+                        covered > 0 -> "Key restored. It signs your copies' updates from now on."
+                        else -> "Key restored. It doesn't match any copy on this phone, but it will sign new ones."
                     },
                 ),
             )
