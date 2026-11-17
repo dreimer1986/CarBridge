@@ -88,7 +88,7 @@ object AppCatalog {
         val autoApps = pm.getInstalledApplications(PackageManager.GET_META_DATA)
             .filter { it.metaData?.containsKey(CAR_APP_META) == true }
             .map { it.packageName }
-            .toSet()
+            .toSet() + carLaunchable(pm)
         // CHECK_LICENSE alone is too common (ad SDKs, free apps) to predict a failure
         val licensed = pm.getInstalledPackages(PackageManager.GET_PROVIDERS or PackageManager.GET_ACTIVITIES)
             .filter { pkg ->
@@ -134,6 +134,12 @@ object AppCatalog {
         val available = sources.values.filter { it.info.packageName !in copied }.sortedBy { it.label.lowercase() }
         return Catalog(copies, available)
     }
+
+    /** Apps already on the car launcher, e.g. copies made by other tools such as AAAnything. */
+    private fun carLaunchable(pm: PackageManager): Set<String> =
+        pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(CarPatch.CAR_CATEGORIES[0]), 0)
+            .map { it.activityInfo.packageName }
+            .toSet()
 
     private fun installer(pm: PackageManager, pkg: String): String? =
         runCatching { pm.getInstallSourceInfo(pkg).installingPackageName }.getOrNull()
