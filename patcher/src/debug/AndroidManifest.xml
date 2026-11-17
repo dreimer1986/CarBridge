@@ -6,5 +6,9 @@
             android:name=".ScreenshotActivity"
             android:exported="true"
             android:theme="@android:style/Theme.Material.NoActionBar" />
+        <!-- Background update test: see AutoUpdateDebugReceiver -->
+        <receiver
+            android:name=".AutoUpdateDebugReceiver"
+            android:exported="true" />
     </application>
 </manifest>
