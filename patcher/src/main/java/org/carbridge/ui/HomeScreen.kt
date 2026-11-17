@@ -778,7 +778,8 @@ private fun JobBar(job: Job, waiting: Int) {
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
-                        JobStep.entries[job.step].text,
+                        // Updates of copies CarBridge installed often skip the prompt
+                        if (job.update && job.step == JobStep.Confirm.ordinal) "Installing the update" else JobStep.entries[job.step].text,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

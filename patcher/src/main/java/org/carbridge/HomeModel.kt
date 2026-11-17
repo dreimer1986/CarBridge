@@ -89,7 +89,7 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Rebuilds every outdated copy in turn; each still needs its own install confirmation. */
+    /** Rebuilds every outdated copy in turn; Android may ask to confirm each install. */
     fun updateAll(copies: List<CarCopy>) {
         if (job != null) return
         updateQueue.clear()

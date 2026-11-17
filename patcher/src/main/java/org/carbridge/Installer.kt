@@ -16,12 +16,17 @@ object Installer {
     private val _events = MutableSharedFlow<Result>(extraBufferCapacity = 8)
     val events: SharedFlow<Result> = _events
 
-    /** Streams the base and split APKs into one install session; Android then asks the user to confirm. */
+    /**
+     * Streams the base and split APKs into one install session. Android asks the user to confirm,
+     * except for updates of a copy CarBridge installed whose targetSdk is recent enough.
+     */
     fun install(context: Context, apks: List<File>, packageName: String) {
         val installer = context.packageManager.packageInstaller
         val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL).apply {
             setAppPackageName(packageName)
             setInstallReason(android.content.pm.PackageManager.INSTALL_REASON_USER)
+            // Only a request: Android still sends STATUS_PENDING_USER_ACTION when it wants a prompt
+            setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED)
         }
         val sessionId = installer.createSession(params)
         installer.openSession(sessionId).use { session ->
