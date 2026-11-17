@@ -1,5 +1,10 @@
 package org.carbridge.ui
 
+import android.content.ClipData
+import android.content.ClipDescription
+import android.content.ClipboardManager
+import android.content.Context
+import android.os.PersistableBundle
 import android.text.format.Formatter
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.RepeatMode
@@ -46,6 +51,7 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
@@ -61,6 +67,7 @@ import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -101,7 +108,10 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -112,11 +122,13 @@ import org.carbridge.Caution
 import org.carbridge.HomeModel
 import org.carbridge.Job
 import org.carbridge.JobStep
+import org.carbridge.RestoreRequest
 import org.carbridge.Setup
 import org.carbridge.SourceApp
 import org.carbridge.UserMessage
 import org.carbridge.Version
 import org.carbridge.core.CarOptions
+import org.carbridge.patch.KeyBackup
 
 class HomeActions(
     val allowInstalls: () -> Unit,
@@ -131,6 +143,9 @@ class HomeActions(
     val setKeepMedia: (CarCopy, Boolean) -> Unit,
     val remove: (CarCopy) -> Unit,
     val open: (CarCopy) -> Unit,
+    /** Opens Android's file picker to save the key backup under the given name. */
+    val saveBackup: (String) -> Unit,
+    val pickBackup: () -> Unit,
 )
 
 private val SignShape = RoundedCornerShape(20.dp)
@@ -150,6 +165,8 @@ fun HomeScreen(model: HomeModel, actions: HomeActions) {
     var showSetup by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
     var cautionFor by remember { mutableStateOf<SourceApp?>(null) }
+    var restoreFirstFor by remember { mutableStateOf<SourceApp?>(null) }
+    var backupLater by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(model) {
         model.messages.collect { message ->
@@ -179,6 +196,10 @@ fun HomeScreen(model: HomeModel, actions: HomeActions) {
     }
     val indexed = shown.size >= INDEX_MIN_APPS
     val labels = remember(shown) { shown.map { it.label } }
+    // Copies signed with a key this phone lost; a key backup can make them updatable again
+    val lost = catalog?.copies?.count { it.needsRestore } ?: 0
+    val offerRestore = lost > 0 && !model.restoreDeclined
+    val addApp = { app: SourceApp -> if (app.caution != null) cautionFor = app else actions.add(app) }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
@@ -204,6 +225,32 @@ fun HomeScreen(model: HomeModel, actions: HomeActions) {
                         SetupCard(setup, actions, onHide = if (setup.complete) ({ showSetup = false }) else null)
                     } else {
                         SetupDone(onShow = { showSetup = true })
+                    }
+                }
+
+                if (offerRestore) {
+                    item("restore") {
+                        KeyCard(
+                            title = if (lost == 1) "1 copy needs your key backup" else "$lost copies need your key backup",
+                            body = "CarBridge was reinstalled or its data cleared, so it can't update copies made before. " +
+                                "If you saved a key backup, restore it.",
+                            action = "Restore backup",
+                            onAction = actions.pickBackup,
+                            other = "I don't have one",
+                            onOther = model::declineRestore,
+                        )
+                    }
+                } else if (catalog != null && catalog.copies.any { !it.signedElsewhere } && !model.backedUp && !backupLater) {
+                    item("backup") {
+                        KeyCard(
+                            title = "Back up your CarBridge key",
+                            body = "If CarBridge is reinstalled or its data cleared, your copies can only update again " +
+                                "with this backup.",
+                            action = "Back up",
+                            onAction = model::startBackup,
+                            other = "Later",
+                            onOther = { backupLater = true },
+                        )
                     }
                 }
 
@@ -251,7 +298,7 @@ fun HomeScreen(model: HomeModel, actions: HomeActions) {
                             app,
                             enabled = !busy,
                             endPadding = if (indexed) Gutter + IndexWidth else Gutter,
-                            onAdd = { if (app.caution != null) cautionFor = app else actions.add(app) },
+                            onAdd = { if (offerRestore) restoreFirstFor = app else addApp(app) },
                         )
                     }
                 }
@@ -316,8 +363,33 @@ fun HomeScreen(model: HomeModel, actions: HomeActions) {
             onOpenMorphe = { cautionFor = null; actions.openMorphe() },
         )
     }
+    restoreFirstFor?.let { app ->
+        AlertDialog(
+            onDismissRequest = { restoreFirstFor = null },
+            title = { Text("Restore your key first?") },
+            text = {
+                Text(
+                    "Restore your key backup before adding apps, so new copies use the same key as the ones " +
+                        "already on your car and one backup covers them all.",
+                )
+            },
+            confirmButton = { TextButton(onClick = { restoreFirstFor = null; actions.pickBackup() }) { Text("Restore backup") } },
+            dismissButton = { TextButton(onClick = { restoreFirstFor = null; addApp(app) }) { Text("Add without it") } },
+        )
+    }
+    model.newBackup?.let { backup ->
+        BackupCodeDialog(backup.code, onSave = { actions.saveBackup(model.backupFileName) }, onDismiss = model::cancelBackup)
+    }
+    model.restoreRequest?.let { request ->
+        RestoreDialog(request, onRestore = model::restore, onDismiss = model::cancelRestore)
+    }
     if (showAbout) {
-        ModalBottomSheet(onDismissRequest = { showAbout = false }) { About() }
+        ModalBottomSheet(onDismissRequest = { showAbout = false }) {
+            About(
+                onBackUp = { showAbout = false; model.startBackup() },
+                onRestore = { showAbout = false; actions.pickBackup() },
+            )
+        }
     }
     details?.let { message ->
         AlertDialog(
@@ -553,7 +625,8 @@ private fun CarSign(
                         Text(
                             when {
                                 copy.original == null -> "Original removed"
-                                copy.signedElsewhere -> "To update, remove it and add it again"
+                                copy.madeByOtherCarBridge -> "Made by another CarBridge app"
+                                copy.signedElsewhere -> "To update, restore your key or add it again"
                                 copy.outdated -> "${versionText(copy.version!!, copy.originalVersion!!)} → " +
                                     versionText(copy.originalVersion, copy.version)
                                 else -> copy.version?.name ?: "In Android Auto"
@@ -889,7 +962,7 @@ private fun LaneProgress(current: Int, total: Int, modifier: Modifier = Modifier
 }
 
 @Composable
-private fun About() {
+private fun About(onBackUp: () -> Unit, onRestore: () -> Unit) {
     Column(
         Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
             .padding(start = 24.dp, end = 24.dp, bottom = 32.dp),
@@ -905,11 +978,17 @@ private fun About() {
             "Some apps won't open",
             "Apps that check their own signature, a license or Play Integrity may refuse to run as a copy.",
         )
-        AboutItem(
-            "Keep CarBridge installed",
-            "Copies are signed with a key stored only on this phone. If you uninstall CarBridge or clear its data, " +
-                "remove your copies and add them again.",
-        )
+        Column {
+            AboutItem(
+                "Back up your key",
+                "Copies are signed with a key stored on this phone. If you uninstall CarBridge or clear its data, " +
+                    "your copies can only update again with a key backup. Keep the file and its code off this phone.",
+            )
+            FlowRow(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilledTonalButton(onClick = onBackUp) { Text("Back up key") }
+                OutlinedButton(onClick = onRestore) { Text("Restore backup") }
+            }
+        }
         AboutItem(
             "Use it safely and fairly",
             "Use car copies only while parked or for passengers. Only copy apps whose license allows changes, " +
@@ -933,4 +1012,123 @@ private fun AboutItem(title: String, body: String) {
             modifier = Modifier.padding(top = 4.dp),
         )
     }
+}
+
+@Composable
+private fun KeyCard(title: String, body: String, action: String, onAction: () -> Unit, other: String, onOther: () -> Unit) {
+    val signs = LocalSigns.current
+    Surface(
+        Modifier.fillMaxWidth().padding(start = Gutter, end = Gutter, top = 20.dp),
+        shape = SignShape,
+        color = signs.caution,
+        contentColor = signs.onCaution,
+    ) {
+        Column(Modifier.padding(20.dp)) {
+            Text(title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.semantics { heading() })
+            Text(
+                body,
+                style = MaterialTheme.typography.bodyMedium,
+                color = signs.onCautionMuted,
+                modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
+            )
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Button(onClick = onAction, colors = cautionButton()) { Text(action) }
+                TextButton(onClick = onOther, colors = ButtonDefaults.textButtonColors(contentColor = signs.onCaution)) {
+                    Text(other)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BackupCodeDialog(code: String, onSave: () -> Unit, onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    var saved by rememberSaveable { mutableStateOf(false) }
+    AlertDialog(
+        onDismissRequest = {},
+        title = { Text("Save your recovery code") },
+        text = {
+            Column {
+                Text(
+                    "You need this code and the backup file to restore your key. CarBridge shows it only once.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                SelectionContainer {
+                    Text(
+                        // Three groups per line, so a group never breaks across lines
+                        code.split("-").chunked(3).joinToString("\n") { it.joinToString("-") },
+                        style = MaterialTheme.typography.titleLarge,
+                        fontFamily = FontFamily.Monospace,
+                        modifier = Modifier.padding(vertical = 16.dp),
+                    )
+                }
+                TextButton(onClick = { copySensitive(context, code) }) { Text("Copy code") }
+                Row(
+                    Modifier.fillMaxWidth().padding(top = 8.dp)
+                        .toggleable(value = saved, role = Role.Checkbox, onValueChange = { saved = it }),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Checkbox(checked = saved, onCheckedChange = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("I've written down or saved the code", style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onSave, enabled = saved) { Text("Save backup file") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
+/** Marked sensitive, so Android hides the code in its clipboard preview. */
+private fun copySensitive(context: Context, text: String) {
+    val clip = ClipData.newPlainText("CarBridge recovery code", text).apply {
+        description.extras = PersistableBundle().apply { putBoolean(ClipDescription.EXTRA_IS_SENSITIVE, true) }
+    }
+    context.getSystemService(ClipboardManager::class.java).setPrimaryClip(clip)
+}
+
+@Composable
+private fun RestoreDialog(request: RestoreRequest, onRestore: (String) -> Unit, onDismiss: () -> Unit) {
+    var code by rememberSaveable { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Restore your key") },
+        text = {
+            Column {
+                Text("Enter the recovery code you saved with this backup.", style = MaterialTheme.typography.bodyMedium)
+                TextField(
+                    value = code,
+                    onValueChange = { code = it },
+                    placeholder = { Text("XXXX-XXXX-XXXX-XXXX-XXXX-XXXX") },
+                    singleLine = true,
+                    isError = request.error != null,
+                    textStyle = MaterialTheme.typography.bodyLarge.copy(fontFamily = FontFamily.Monospace),
+                    keyboardOptions = KeyboardOptions(
+                        capitalization = KeyboardCapitalization.Characters,
+                        autoCorrectEnabled = false,
+                        keyboardType = KeyboardType.Password,
+                        imeAction = ImeAction.Done,
+                    ),
+                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                )
+                request.error?.let {
+                    Text(
+                        it,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            if (request.working) {
+                CircularProgressIndicator(Modifier.size(24.dp))
+            } else {
+                TextButton(onClick = { onRestore(code) }, enabled = KeyBackup.isWellFormed(code)) { Text("Restore") }
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss, enabled = !request.working) { Text("Cancel") } },
+    )
 }

@@ -50,7 +50,7 @@ object Installer {
         val meaning = when (status) {
             PackageInstaller.STATUS_FAILURE_CONFLICT ->
                 "An existing car copy was signed with another key, e.g. before CarBridge was reinstalled " +
-                    "or its data cleared. Uninstall that copy, then add it again."
+                    "or its data cleared. Restore your key backup from About, or uninstall that copy and add it again."
             PackageInstaller.STATUS_FAILURE_STORAGE -> "Not enough storage for the car copy."
             PackageInstaller.STATUS_FAILURE_INCOMPATIBLE ->
                 "Android says the copy doesn't fit this phone, e.g. a missing split APK or another CPU type."

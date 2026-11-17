@@ -15,6 +15,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import androidx.lifecycle.ViewModelProvider
+import org.carbridge.patch.KeyBackup
 import org.carbridge.ui.CarBridgeTheme
 import org.carbridge.ui.HomeActions
 import org.carbridge.ui.HomeScreen
@@ -22,6 +23,13 @@ import org.carbridge.ui.HomeScreen
 class MainActivity : ComponentActivity() {
     private val model by lazy { ViewModelProvider(this)[HomeModel::class.java] }
     private val askNotifications = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    // A cancelled picker keeps the code dialog open, so the user can try again
+    private val saveBackup = registerForActivityResult(ActivityResultContracts.CreateDocument(KeyBackup.MIME_TYPE)) { uri ->
+        uri?.let(model::saveBackup)
+    }
+    private val pickBackup = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let(model::openRestore)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // The header is always guide-sign green, so status bar icons stay light in both themes
@@ -42,6 +50,9 @@ class MainActivity : ComponentActivity() {
             setKeepMedia = model::setKeepMedia,
             remove = { copy -> startActivity(Intent(Intent.ACTION_DELETE, Uri.parse("package:${copy.packageName}"))) },
             open = { copy -> packageManager.getLaunchIntentForPackage(copy.packageName)?.let(::startActivity) },
+            saveBackup = saveBackup::launch,
+            // Files apps rarely know the .cbkey type, so show every file
+            pickBackup = { pickBackup.launch(arrayOf("*/*")) },
         )
         UpdateCheck.schedule(this)
         if (savedInstanceState == null) handleUpdateIntent(intent)

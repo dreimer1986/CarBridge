@@ -1,6 +1,7 @@
 package org.carbridge
 
 import android.app.Application
+import android.net.Uri
 import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -9,12 +10,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import java.time.LocalDate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.carbridge.core.CarOptions
+import org.carbridge.patch.BackupFailure
+import org.carbridge.patch.KeyBackup
+import org.carbridge.patch.KeystoreSigner
 import org.carbridge.patch.PatchFailure
 import org.carbridge.patch.PatchPipeline
 
@@ -48,6 +53,12 @@ data class Setup(val canInstall: Boolean, val developerMode: Boolean, val unknow
 data class AddChoice(val app: SourceApp, val portraitLocked: Boolean, val hasMediaService: Boolean)
 
 data class UserMessage(val text: String, val details: String? = null)
+
+/** A key backup made but not yet saved; [code] is shown once and never stored. */
+class NewBackup(val file: ByteArray, val code: String)
+
+/** A backup file the user picked, waiting for its recovery code. */
+class RestoreRequest(val file: ByteArray, val error: String? = null, val working: Boolean = false)
 
 class HomeModel(app: Application) : AndroidViewModel(app) {
     private val prefs = app.getSharedPreferences("setup", 0)
@@ -187,10 +198,112 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
         sample?.let { setup = Setup(canInstall = true, developerMode = true, unknownSources = true); catalog = it; return }
         setup = readSetup()
         viewModelScope.launch {
-            val loaded = withContext(Dispatchers.IO) { AppCatalog.load(getApplication(), ::carOptions) }
+            val (loaded, backed) = withContext(Dispatchers.IO) {
+                AppCatalog.load(getApplication(), ::carOptions) to KeystoreSigner(getApplication()).hasBackup()
+            }
             catalog = loaded
+            backedUp = backed
             runPendingUpdate(loaded)
         }
+    }
+
+    /** Starts true so the backup card doesn't flash before the first load. */
+    var backedUp by mutableStateOf(true)
+        private set
+    var restoreDeclined by mutableStateOf(prefs.getBoolean("restore_declined", false))
+        private set
+    var newBackup by mutableStateOf<NewBackup?>(null)
+        private set
+    var restoreRequest by mutableStateOf<RestoreRequest?>(null)
+        private set
+
+    val backupFileName get() = "carbridge-key-${LocalDate.now()}.${KeyBackup.FILE_EXTENSION}"
+
+    fun startBackup() {
+        viewModelScope.launch {
+            withContext(Dispatchers.Default) { runCatching { KeystoreSigner(getApplication()).createBackup() } }
+                .onSuccess { (file, code) -> newBackup = NewBackup(file, code) }
+                .onFailure { e ->
+                    Log.e(TAG, "backup failed", e)
+                    _messages.send(UserMessage("Couldn't make a key backup.", "${e.javaClass.simpleName}: ${e.message}"))
+                }
+        }
+    }
+
+    fun cancelBackup() {
+        newBackup = null
+    }
+
+    /** Writes the backup to the file the user picked; nothing is marked saved if that fails. */
+    fun saveBackup(uri: Uri) {
+        val backup = newBackup ?: return
+        newBackup = null
+        val context = getApplication<Application>()
+        viewModelScope.launch {
+            val saved = withContext(Dispatchers.IO) {
+                runCatching {
+                    context.contentResolver.openOutputStream(uri, "wt")!!.use { it.write(backup.file) }
+                    KeystoreSigner(context).markBackedUp()
+                }
+            }
+            backedUp = saved.isSuccess
+            _messages.send(
+                if (saved.isSuccess) UserMessage("Key backed up. Keep the file and the code somewhere other than this phone.")
+                else UserMessage("Couldn't save the backup.", saved.exceptionOrNull()?.message),
+            )
+        }
+    }
+
+    fun openRestore(uri: Uri) {
+        val context = getApplication<Application>()
+        viewModelScope.launch {
+            val file = withContext(Dispatchers.IO) {
+                runCatching { context.contentResolver.openInputStream(uri)!!.use { it.readBytes() } }
+            }
+            file.onSuccess { restoreRequest = RestoreRequest(it) }
+                .onFailure { _messages.send(UserMessage("Couldn't open that file.", it.message)) }
+        }
+    }
+
+    fun restore(code: String) {
+        val request = restoreRequest ?: return
+        restoreRequest = RestoreRequest(request.file, working = true)
+        val context = getApplication<Application>()
+        viewModelScope.launch {
+            val lostBefore = catalog?.copies?.count { it.needsRestore } ?: 0
+            val result = withContext(Dispatchers.Default) {
+                runCatching { KeystoreSigner(context).restore(request.file, code) }
+            }
+            result.exceptionOrNull()?.let { e ->
+                Log.w(TAG, "restore failed", e)
+                restoreRequest = RestoreRequest(request.file, error = (e as? BackupFailure)?.message ?: "This backup couldn't be restored.")
+                return@launch
+            }
+            restoreRequest = null
+            val loaded = withContext(Dispatchers.IO) { AppCatalog.load(context, ::carOptions) }
+            catalog = loaded
+            backedUp = true
+            val fixed = lostBefore - loaded.copies.count { it.needsRestore }
+            _messages.send(
+                UserMessage(
+                    when (fixed) {
+                        0 -> "Key restored. It doesn't match any copy on this phone, but it will sign new ones."
+                        1 -> "Key restored. 1 copy can update again."
+                        else -> "Key restored. $fixed copies can update again."
+                    },
+                ),
+            )
+        }
+    }
+
+    fun cancelRestore() {
+        restoreRequest = null
+    }
+
+    /** The user has no backup, so stop offering a restore for copies signed with a lost key. */
+    fun declineRestore() {
+        prefs.edit().putBoolean("restore_declined", true).apply()
+        restoreDeclined = true
     }
 
     fun toggleAutoApps() {
