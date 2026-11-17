@@ -44,8 +44,11 @@ object UpdateCheck {
 
     data class Outdated(val originalPackage: String, val label: String, val originalCode: Long)
 
-    /** Lightweight version of [AppCatalog.load]: no icons, only copies whose original is newer. */
-    fun findOutdated(context: Context): List<Outdated> {
+    /**
+     * Lightweight version of [AppCatalog.load]: no icons, only copies whose original is newer, or
+     * every updatable copy when [forced] (a debug test hook).
+     */
+    fun findOutdated(context: Context, forced: Boolean = false): List<Outdated> {
         val pm = context.packageManager
         val suffix = PatchPipeline.carPackageName("")
         val signer = KeystoreSigner(context)
@@ -54,7 +57,7 @@ object UpdateCheck {
             .mapNotNull { copy ->
                 val originalPkg = copy.packageName.removeSuffix(suffix)
                 val original = runCatching { pm.getPackageInfo(originalPkg, 0) }.getOrNull() ?: return@mapNotNull null
-                if (original.longVersionCode <= copy.longVersionCode) return@mapNotNull null
+                if (!forced && original.longVersionCode <= copy.longVersionCode) return@mapNotNull null
                 // An update couldn't install over it, so don't ask for one
                 if (!signer.canUpdate(pm, copy.packageName)) return@mapNotNull null
                 val label = original.applicationInfo?.loadLabel(pm)?.toString() ?: originalPkg
@@ -65,7 +68,12 @@ object UpdateCheck {
     fun run(context: Context) {
         val prefs = context.getSharedPreferences("setup", 0)
         // Only versions not yet announced, so each original update notifies once
-        val outdated = findOutdated(context)
+        val all = findOutdated(context)
+        AutoUpdate.noteOutdated(context, all)
+        val automatic = AutoUpdate.pending(context, all)
+        if (automatic.isNotEmpty()) AutoUpdate.schedule(context)
+        // Copies the background job will handle don't need the user
+        val outdated = all - automatic.toSet()
         val fresh = outdated.filter { prefs.getLong("notified:${it.originalPackage}", 0) < it.originalCode }
         if (fresh.isEmpty()) return
         if (notify(context, outdated)) {

@@ -20,15 +20,22 @@ object CopyBuilder {
 
     /**
      * Builds [app]'s copy and hands it to Android's installer; blocks, so call it off the main
-     * thread. Returns false without doing anything when another copy is being built.
+     * thread. Returns false without doing anything when another copy is being built. A
+     * [background] build reports its result in notifications, since it can't open screens.
      */
-    fun build(context: Context, app: ApplicationInfo, log: (String) -> Unit, onPatched: () -> Unit = {}): Boolean {
+    fun build(
+        context: Context,
+        app: ApplicationInfo,
+        log: (String) -> Unit,
+        background: Boolean = false,
+        onPatched: () -> Unit = {},
+    ): Boolean {
         val carPackage = PatchPipeline.carPackageName(app.packageName)
         if (!_building.compareAndSet(null, carPackage)) return false
         try {
             val apks = PatchPipeline(context, log).patch(app, options(context, app.packageName))
             onPatched()
-            Installer.install(context, apks, carPackage)
+            Installer.install(context, apks, carPackage, background)
         } finally {
             // The install session holds its own copy once committed
             PatchPipeline.clearWork(context)

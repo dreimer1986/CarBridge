@@ -20,7 +20,7 @@ object Installer {
      * Streams the base and split APKs into one install session. Android asks the user to confirm,
      * except for updates of a copy CarBridge installed whose targetSdk is recent enough.
      */
-    fun install(context: Context, apks: List<File>, packageName: String) {
+    fun install(context: Context, apks: List<File>, packageName: String, background: Boolean = false) {
         val installer = context.packageManager.packageInstaller
         val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL).apply {
             setAppPackageName(packageName)
@@ -37,6 +37,8 @@ object Installer {
                 }
             }
             val intent = Intent(context, InstallStatusReceiver::class.java)
+                .putExtra(EXTRA_CAR_PACKAGE, packageName)
+                .putExtra(EXTRA_BACKGROUND, background)
             val pending = PendingIntent.getBroadcast(
                 context, sessionId, intent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE,
@@ -64,6 +66,9 @@ object Installer {
         return "$meaning\nAndroid (status $status): ${systemMessage ?: "no message"}"
     }
 
+    const val EXTRA_CAR_PACKAGE = "org.carbridge.extra.CAR_PACKAGE"
+    const val EXTRA_BACKGROUND = "org.carbridge.extra.BACKGROUND"
+
     internal fun report(result: Result) {
         _events.tryEmit(result)
     }
@@ -72,9 +77,11 @@ object Installer {
 class InstallStatusReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)
-        val pkg = intent.getStringExtra(PackageInstaller.EXTRA_PACKAGE_NAME)
+        val pkg = intent.getStringExtra(PackageInstaller.EXTRA_PACKAGE_NAME) ?: intent.getStringExtra(Installer.EXTRA_CAR_PACKAGE)
+        if (intent.getBooleanExtra(Installer.EXTRA_BACKGROUND, false) && pkg != null) reportInBackground(context, intent, status, pkg)
         when (status) {
             PackageInstaller.STATUS_PENDING_USER_ACTION -> {
+                if (intent.getBooleanExtra(Installer.EXTRA_BACKGROUND, false)) return
                 @Suppress("DEPRECATION")
                 val confirm = intent.getParcelableExtra(Intent.EXTRA_INTENT, Intent::class.java) ?: return
                 context.startActivity(confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
@@ -85,6 +92,29 @@ class InstallStatusReceiver : BroadcastReceiver() {
                 val cancelled = status == PackageInstaller.STATUS_FAILURE_ABORTED
                 Installer.report(Installer.Result(pkg, false, cancelled, Installer.describeFailure(status, msg)))
             }
+        }
+    }
+
+    /** Background updates can't open screens, so their outcome, or the prompt, is a notification. */
+    private fun reportInBackground(context: Context, intent: Intent, status: Int, pkg: String) {
+        val label = AutoUpdate.labelOf(context, pkg)
+        when (status) {
+            PackageInstaller.STATUS_PENDING_USER_ACTION -> {
+                @Suppress("DEPRECATION")
+                val confirm = intent.getParcelableExtra(Intent.EXTRA_INTENT, Intent::class.java) ?: return
+                val tap = PendingIntent.getActivity(
+                    context, pkg.hashCode(), confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), PendingIntent.FLAG_IMMUTABLE,
+                )
+                AutoUpdate.notifyResult(context, label, "Android needs you to confirm its car copy update. Tap to finish.", action = tap)
+            }
+            PackageInstaller.STATUS_SUCCESS -> {
+                val version = runCatching { context.packageManager.getPackageInfo(pkg, 0).versionName }.getOrNull()
+                AutoUpdate.notifyResult(context, label, if (version != null) "Car copy updated to $version." else "Car copy updated.")
+            }
+            else -> AutoUpdate.notifyResult(
+                context, label, "Couldn't update its car copy. Open CarBridge to try again.",
+                Installer.describeFailure(status, intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE)),
+            )
         }
     }
 }
