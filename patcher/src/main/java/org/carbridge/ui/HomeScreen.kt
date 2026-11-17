@@ -64,6 +64,7 @@ import androidx.compose.material.icons.rounded.Phone
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -89,6 +90,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -162,6 +164,7 @@ fun HomeScreen(model: HomeModel, actions: HomeActions) {
     val snackbar = remember { SnackbarHostState() }
     var details by remember { mutableStateOf<UserMessage?>(null) }
     var showAbout by rememberSaveable { mutableStateOf(false) }
+    var showSettings by rememberSaveable { mutableStateOf(false) }
     var showSetup by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
     var cautionFor by remember { mutableStateOf<SourceApp?>(null) }
@@ -221,7 +224,7 @@ fun HomeScreen(model: HomeModel, actions: HomeActions) {
                     bottom = inner.calculateBottomPadding() + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 24.dp,
                 ),
             ) {
-                item("header") { SignHeader(onAbout = { showAbout = true }) }
+                item("header") { SignHeader(onSettings = { showSettings = true }, onAbout = { showAbout = true }) }
 
                 item("setup") {
                     if (!setup.complete || showSetup) {
@@ -388,12 +391,20 @@ fun HomeScreen(model: HomeModel, actions: HomeActions) {
         RestoreDialog(request, onRestore = model::restore, onDismiss = model::cancelRestore)
     }
     if (showAbout) {
-        ModalBottomSheet(onDismissRequest = { showAbout = false }) {
-            About(
+        ModalBottomSheet(onDismissRequest = { showAbout = false }) { About() }
+    }
+    if (showSettings) {
+        // Short enough to show whole, so the key buttons never start behind the navigation bar
+        ModalBottomSheet(
+            onDismissRequest = { showSettings = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        ) {
+            Settings(
                 autoUpdate = model.autoUpdate,
                 onAutoUpdate = model::switchAutoUpdate,
-                onBackUp = { showAbout = false; model.startBackup() },
-                onRestore = { showAbout = false; actions.pickBackup() },
+                backedUp = model.backedUp,
+                onBackUp = { showSettings = false; model.startBackup() },
+                onRestore = { showSettings = false; actions.pickBackup() },
             )
         }
     }
@@ -430,7 +441,7 @@ private fun GuidePanel(modifier: Modifier = Modifier, content: @Composable Colum
 }
 
 @Composable
-private fun SignHeader(onAbout: () -> Unit) {
+private fun SignHeader(onSettings: () -> Unit, onAbout: () -> Unit) {
     val signs = LocalSigns.current
     Column(
         Modifier.fillMaxWidth().background(signs.guide)
@@ -446,6 +457,9 @@ private fun SignHeader(onAbout: () -> Unit) {
                 color = signs.onGuide,
                 modifier = Modifier.weight(1f).semantics { heading() },
             )
+            IconButton(onClick = onSettings) {
+                Icon(Icons.Rounded.Settings, contentDescription = "Settings", tint = signs.onGuide)
+            }
             IconButton(onClick = onAbout) {
                 Icon(Icons.Rounded.Info, contentDescription = "About CarBridge", tint = signs.onGuide)
             }
@@ -1001,9 +1015,10 @@ private fun LaneProgress(current: Int, total: Int, modifier: Modifier = Modifier
 }
 
 @Composable
-private fun About(autoUpdate: Boolean, onAutoUpdate: (Boolean) -> Unit, onBackUp: () -> Unit, onRestore: () -> Unit) {
+private fun About() {
     Column(
         Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
+            .navigationBarsPadding()
             .padding(start = 24.dp, end = 24.dp, bottom = 32.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
@@ -1017,6 +1032,38 @@ private fun About(autoUpdate: Boolean, onAutoUpdate: (Boolean) -> Unit, onBackUp
             "Some apps won't open",
             "Apps that check their own signature, a license or Play Integrity may refuse to run as a copy.",
         )
+        AboutItem(
+            "Keep your key safe",
+            "Copies are signed with a key stored on this phone. Back it up in Settings, so your copies can " +
+                "still update if CarBridge is reinstalled or its data cleared.",
+        )
+        AboutItem(
+            "Use it safely and fairly",
+            "Use car copies only while parked or for passengers. Only copy apps whose license allows changes, " +
+                "and don't share the copies.",
+        )
+        AboutItem(
+            "Free software",
+            "GPL-3.0. No accounts, ads or tracking. Everything happens on this phone.",
+        )
+    }
+}
+
+@Composable
+private fun Settings(
+    autoUpdate: Boolean,
+    onAutoUpdate: (Boolean) -> Unit,
+    backedUp: Boolean,
+    onBackUp: () -> Unit,
+    onRestore: () -> Unit,
+) {
+    Column(
+        Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
+            .navigationBarsPadding()
+            .padding(start = 24.dp, end = 24.dp, bottom = 32.dp),
+        verticalArrangement = Arrangement.spacedBy(24.dp),
+    ) {
+        Text("Settings", style = MaterialTheme.typography.headlineSmall)
         Row(
             Modifier.fillMaxWidth().toggleable(value = autoUpdate, role = Role.Switch, onValueChange = onAutoUpdate),
             verticalAlignment = Alignment.CenterVertically,
@@ -1032,24 +1079,16 @@ private fun About(autoUpdate: Boolean, onAutoUpdate: (Boolean) -> Unit, onBackUp
         }
         Column {
             AboutItem(
-                "Back up your key",
-                "Copies are signed with a key stored on this phone. If you uninstall CarBridge or clear its data, " +
-                    "your copies can only update again with a key backup. Keep the file and its code off this phone.",
+                "Your CarBridge key",
+                (if (backedUp) "Backed up. " else "Not backed up yet. ") +
+                    "If CarBridge is reinstalled or its data cleared, your copies can only update again with a key " +
+                    "backup. Keep the file and its code off this phone.",
             )
-            FlowRow(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilledTonalButton(onClick = onBackUp) { Text("Back up key") }
+            FlowRow(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilledTonalButton(onClick = onBackUp) { Text(if (backedUp) "Back up again" else "Back up key") }
                 OutlinedButton(onClick = onRestore) { Text("Restore backup") }
             }
         }
-        AboutItem(
-            "Use it safely and fairly",
-            "Use car copies only while parked or for passengers. Only copy apps whose license allows changes, " +
-                "and don't share the copies.",
-        )
-        AboutItem(
-            "Free software",
-            "GPL-3.0. No accounts, ads or tracking. Everything happens on this phone.",
-        )
     }
 }
 

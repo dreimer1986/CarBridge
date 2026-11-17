@@ -87,7 +87,7 @@ as `<package>.car` next to the original, named "<App> (Car)" with a bridge badge
 reconnect Android Auto. Tap a copy in CarBridge to open it on the phone, e.g. to sign in, since
 copies start with no data. When the original updates, CarBridge sends a notification, flags the copy,
 and offers **Update all** when several are out of date. With **Update copies automatically** on
-(About, or the notification's button), a job rebuilds outdated copies one at a time while the
+(Settings, or the notification's button), a job rebuilds outdated copies one at a time while the
 phone charges and installs them without a prompt where Android allows; a copy's ⋮ menu opts it
 out. Each original version is tried once, and a copy still waiting after two days, or one that
 failed, gets the notification instead. Copies drop portrait locks so they fill the
@@ -182,7 +182,7 @@ Any activity of the patched package may then run on its car display, not just th
 ## Key backup
 
 Copies are signed with a non-exportable Keystore key, which dies with CarBridge's data. To survive
-that, **Back up** (a card once a copy exists, or About) makes a second RSA-3072 key in software and
+that, **Back up** (a card once a copy exists, or Settings) makes a second RSA-3072 key in software and
 has the Keystore key sign an APK Signature Scheme v3 rotation lineage to it. The backup key,
 its certificate (`patch/SelfSignedCertificate.kt`) and the lineage go into a `.cbkey` file
 encrypted with AES-256-GCM under a PBKDF2 key from a 24-character recovery code shown once. The
