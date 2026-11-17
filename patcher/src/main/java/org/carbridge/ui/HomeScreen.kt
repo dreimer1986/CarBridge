@@ -7,6 +7,8 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Image
@@ -23,6 +25,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -31,11 +34,15 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -70,15 +77,18 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -87,17 +97,17 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 import org.carbridge.AddChoice
 import org.carbridge.CarCopy
-import org.carbridge.core.CarOptions
-import androidx.compose.foundation.selection.toggleable
-import androidx.compose.material3.Switch
-import androidx.compose.ui.semantics.Role
 import org.carbridge.Caution
 import org.carbridge.HomeModel
 import org.carbridge.Job
@@ -106,6 +116,7 @@ import org.carbridge.Setup
 import org.carbridge.SourceApp
 import org.carbridge.UserMessage
 import org.carbridge.Version
+import org.carbridge.core.CarOptions
 
 class HomeActions(
     val allowInstalls: () -> Unit,
@@ -125,6 +136,10 @@ class HomeActions(
 private val SignShape = RoundedCornerShape(20.dp)
 private val SignBorderShape = RoundedCornerShape(15.dp)
 private val Gutter = 16.dp
+
+/** Below this many apps the list is short enough to scroll by hand. */
+private const val INDEX_MIN_APPS = 15
+private val APP_LIST_KEYS = setOf("add-title", "search", "auto-toggle", "add-empty", "footer")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -152,6 +167,18 @@ fun HomeScreen(model: HomeModel, actions: HomeActions) {
     val job = model.job
     val setup = model.setup
     val busy = job != null
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+
+    // Apps shown under "Add an app", computed here so the letter index can see them
+    val search = query.trim()
+    val shown = catalog?.available.orEmpty().filter {
+        // A search is explicit, so it also finds apps that already have Android Auto
+        if (search.isNotEmpty()) it.label.contains(search, ignoreCase = true)
+        else model.showAutoApps || !it.hasAndroidAuto
+    }
+    val indexed = shown.size >= INDEX_MIN_APPS
+    val labels = remember(shown) { shown.map { it.label } }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
@@ -165,6 +192,7 @@ fun HomeScreen(model: HomeModel, actions: HomeActions) {
         Box(Modifier.fillMaxSize()) {
             LazyColumn(
                 Modifier.fillMaxSize(),
+                state = listState,
                 contentPadding = PaddingValues(
                     bottom = inner.calculateBottomPadding() + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 24.dp,
                 ),
@@ -209,12 +237,6 @@ fun HomeScreen(model: HomeModel, actions: HomeActions) {
                     if (catalog.available.size > 6) {
                         item("search") { SearchField(query) { query = it } }
                     }
-                    val search = query.trim()
-                    // A search is explicit, so it also finds apps that already have Android Auto
-                    val shown = catalog.available.filter {
-                        if (search.isNotEmpty()) it.label.contains(search, ignoreCase = true)
-                        else model.showAutoApps || !it.hasAndroidAuto
-                    }
                     val autoCount = catalog.available.count { it.hasAndroidAuto }
                     if (search.isEmpty() && autoCount > 0) {
                         item("auto-toggle") { AutoAppsToggle(autoCount, model.showAutoApps, model::toggleAutoApps) }
@@ -228,12 +250,51 @@ fun HomeScreen(model: HomeModel, actions: HomeActions) {
                         SourceRow(
                             app,
                             enabled = !busy,
+                            endPadding = if (indexed) Gutter + IndexWidth else Gutter,
                             onAdd = { if (app.caution != null) cautionFor = app else actions.add(app) },
                         )
                     }
                 }
 
                 item("footer") { Footer(onAbout = { showAbout = true }) }
+            }
+
+            if (indexed) {
+                // App rows come after every other item but the footer
+                val firstSource by remember { derivedStateOf { listState.layoutInfo.totalItemsCount - 1 - labels.size } }
+                // Only once "Add an app" reaches the top, so the strip never covers the car copies
+                val inAppList by remember {
+                    derivedStateOf {
+                        val key = listState.layoutInfo.visibleItemsInfo.firstOrNull()?.key as? String
+                        key != null && (key in APP_LIST_KEYS || key.startsWith("src:"))
+                    }
+                }
+                val statusBarPx = WindowInsets.statusBars.getTop(LocalDensity.current)
+                val topApp by remember(statusBarPx) {
+                    derivedStateOf {
+                        // A row half under the status bar doesn't count as the top one
+                        listState.layoutInfo.visibleItemsInfo
+                            .firstOrNull { (it.key as? String)?.startsWith("src:") == true && it.offset + it.size / 2 > statusBarPx }
+                            ?.let { labels.getOrNull(it.index - firstSource) }
+                    }
+                }
+                AnimatedVisibility(
+                    inAppList,
+                    Modifier.align(Alignment.CenterEnd).fillMaxHeight()
+                        .windowInsetsPadding(WindowInsets.statusBars.union(WindowInsets.navigationBars))
+                        .padding(top = 8.dp, bottom = inner.calculateBottomPadding() + 8.dp),
+                    enter = fadeIn(),
+                    exit = fadeOut(),
+                ) {
+                    AlphabetIndex(
+                        present = remember(labels) { labels.map(Letters::of).toSet() },
+                        current = topApp?.let(Letters::of),
+                        onLetter = { letter ->
+                            Letters.target(labels, letter)?.let { i -> scope.launch { listState.scrollToItem(firstSource + i) } }
+                        },
+                        modifier = Modifier.padding(end = 4.dp),
+                    )
+                }
             }
 
             // Keeps light status bar icons readable once the header scrolls away
@@ -625,10 +686,10 @@ private fun AutoAppsToggle(count: Int, showing: Boolean, onToggle: () -> Unit) {
 }
 
 @Composable
-private fun SourceRow(app: SourceApp, enabled: Boolean, onAdd: () -> Unit) {
+private fun SourceRow(app: SourceApp, enabled: Boolean, endPadding: Dp, onAdd: () -> Unit) {
     val context = LocalContext.current
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = Gutter, vertical = 8.dp),
+        Modifier.fillMaxWidth().padding(start = Gutter, end = endPadding, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         AppIcon(app.icon, 44)
