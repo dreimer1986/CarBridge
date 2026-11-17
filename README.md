@@ -217,9 +217,12 @@ certificate SHA-256 `a4:68:93:60:a9:1a:49:b1:6f:a7:b1:50:dc:fc:6e:2b:89:21:1a:cd
 Its password is in `~/.gradle/gradle.properties` as `CARBRIDGE_*`; neither is in the repo.
 Without them, `assembleRelease` falls back to the debug key.
 
-Publish a release with `scripts/release.sh` after bumping `versionCode` and `versionName` and
-adding `fastlane/metadata/android/en-US/changelogs/<versionCode>.txt`. It refuses to upload an APK
-that isn't signed with the release key.
+Note user-facing changes under `## [Unreleased]` in `CHANGELOG.md` as they land on `dev`; Dev
+pre-releases show that section. To publish a release, bump `versionCode` and `versionName`, rename
+`[Unreleased]` to `[<versionName>] - <date>`, add
+`fastlane/metadata/android/en-US/changelogs/<versionCode>.txt` (short form, for F-Droid), then run
+`scripts/release.sh`. It refuses a version without a changelog section, and an APK that isn't signed
+with the release key.
 
 If the repo has the `CARBRIDGE_KEYSTORE` secret, the script only tags and pushes, and
 `.github/workflows/release.yml` builds, verifies and publishes the release. That stores the key in

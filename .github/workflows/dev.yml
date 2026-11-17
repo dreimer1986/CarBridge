@@ -60,9 +60,15 @@ jobs:
           version="$(sed -n 's/.*versionName = "\(.*\)".*/\1/p' patcher/build.gradle.kts)-dev.${{ github.run_number }}"
           out="CarBridge-Dev-$version.apk"
           cp patcher/build/outputs/apk/dev/patcher-dev.apk "$out"
+          {
+            echo "Development build of \`dev\` at $GITHUB_SHA. Installs as CarBridge Dev next to CarBridge; may be unstable."
+            echo
+            echo "## Changes since the last release"
+            echo
+            scripts/changelog-section.sh Unreleased
+          } > notes.md
           gh release create "v$version" "$out" --target "$GITHUB_SHA" --prerelease --latest=false \
-            --title "CarBridge Dev $version" \
-            --notes "Development build of \`dev\` at $GITHUB_SHA. Installs as CarBridge Dev next to CarBridge; may be unstable."
+            --title "CarBridge Dev $version" --notes-file notes.md
 
       - name: Delete older dev pre-releases
         env:

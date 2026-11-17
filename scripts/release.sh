@@ -13,6 +13,7 @@ tag="v$version"
 
 [[ -z "$(git status --porcelain)" ]] || { echo "Working tree not clean" >&2; exit 1; }
 git rev-parse -q --verify "refs/tags/$tag" >/dev/null && { echo "$tag already exists; bump versionName/versionCode" >&2; exit 1; }
+[[ -n "$(scripts/changelog-section.sh "$version")" ]] || { echo "Rename [Unreleased] in CHANGELOG.md to [$version] first" >&2; exit 1; }
 
 # With the signing secrets in the repo, the Release workflow builds and publishes from the tag
 if gh secret list 2>/dev/null | grep -q '^CARBRIDGE_KEYSTORE'; then
@@ -33,4 +34,4 @@ out="patcher/build/CarBridge-$version.apk"
 cp "$apk" "$out"
 git tag -a "$tag" -m "CarBridge $version"
 git push origin HEAD "$tag"
-gh release create "$tag" "$out" --title "CarBridge $version" --generate-notes
+gh release create "$tag" "$out" --title "CarBridge $version" --notes "$(scripts/changelog-section.sh "$version")"

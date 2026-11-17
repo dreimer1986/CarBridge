@@ -70,7 +70,9 @@ jobs:
           version="${GITHUB_REF_NAME#v}"
           out="CarBridge-$version.apk"
           cp patcher/build/outputs/apk/release/patcher-release.apk "$out"
-          gh release create "$GITHUB_REF_NAME" "$out" --title "CarBridge $version" --generate-notes
+          scripts/changelog-section.sh "$version" > notes.md
+          [ -s notes.md ] || { echo "CHANGELOG.md has no [$version] section" >&2; exit 1; }
+          gh release create "$GITHUB_REF_NAME" "$out" --title "CarBridge $version" --notes-file notes.md
 
       - name: Remove key
         if: always()
