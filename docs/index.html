@@ -1,0 +1,467 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CarBridge – Your phone's apps on your Android Auto screen</title>
+<meta name="description" content="CarBridge makes a car copy of an app you already have, so Android Auto lists it and shows its full interface on your car's screen while parked. Free, open source, all on your phone.">
+<meta name="theme-color" content="#0B6B4C">
+<meta property="og:title" content="CarBridge">
+<meta property="og:description" content="Put the apps on your phone on your Android Auto screen, while parked. Free and open source.">
+<meta property="og:image" content="https://jmwerk.github.io/CarBridge/img/icon.png">
+<meta property="og:type" content="website">
+<link rel="icon" href="img/icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Overpass:wght@400;500;600;700;800&family=Overpass+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --guide: #0B6B4C;
+    --on-guide: #fff;
+    --on-guide-muted: #CDEBDD;
+    --caution: #F6C700;
+    --on-caution: #1C1800;
+    --bg: #F5FAF6;
+    --surface: #E9EFEA;
+    --surface-high: #DEE4DF;
+    --text: #171D1A;
+    --muted: #404943;
+    --outline: #BFC9C2;
+    --accent: #0B6B4C;
+    --shadow: 0 1px 2px rgb(0 0 0 / .08), 0 8px 24px rgb(0 0 0 / .08);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --guide: #0A5C42;
+      --caution: #E3B800;
+      --bg: #0F1412;
+      --surface: #1B211E;
+      --surface-high: #252B28;
+      --text: #DEE4DF;
+      --muted: #BFC9C2;
+      --outline: #404943;
+      --accent: #8AD6B3;
+      --shadow: 0 1px 2px rgb(0 0 0 / .4), 0 8px 24px rgb(0 0 0 / .3);
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 400 1.0625rem/1.6 Overpass, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--accent); text-underline-offset: .2em; }
+  a:hover { text-decoration-thickness: 2px; }
+  h1, h2, h3 { line-height: 1.15; margin: 0; font-weight: 800; letter-spacing: -.01em; }
+  h2 { font-size: clamp(1.75rem, 4vw, 2.5rem); }
+  h3 { font-size: 1.2rem; font-weight: 700; }
+  p { margin: 0; }
+  code, .mono { font-family: "Overpass Mono", ui-monospace, monospace; font-size: .9em; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 16px; }
+  @media (min-width: 640px) { .wrap { padding: 0 32px; } }
+  section { padding: 72px 0; }
+  .lede { color: var(--muted); font-size: 1.15rem; max-width: 60ch; margin-top: 12px; }
+  .skip { position: absolute; left: -999px; }
+  .skip:focus { left: 16px; top: 16px; background: var(--caution); color: var(--on-caution); padding: 8px 12px; z-index: 9; }
+
+  /* Guide sign: green field, inset white border, rounded corners */
+  .sign {
+    background: var(--guide);
+    color: var(--on-guide);
+    border-radius: 20px;
+    padding: 6px;
+    box-shadow: var(--shadow);
+  }
+  .sign > .inner {
+    border: 3px solid var(--on-guide);
+    border-radius: 15px;
+    padding: 24px;
+  }
+  .sign a { color: var(--on-guide); }
+
+  /* Header */
+  header.top { background: var(--guide); color: var(--on-guide); }
+  header.top .wrap { display: flex; align-items: center; justify-content: space-between; height: 64px; gap: 16px; }
+  .brand { display: flex; align-items: center; gap: 10px; color: inherit; text-decoration: none; font-weight: 800; font-size: 1.35rem; }
+  .brand svg { width: 34px; height: 34px; }
+  nav.links { display: flex; gap: 20px; font-weight: 600; }
+  nav.links a { color: var(--on-guide-muted); text-decoration: none; }
+  nav.links a:hover { color: var(--on-guide); }
+  @media (max-width: 640px) { nav.links .opt { display: none; } }
+
+  /* Hero */
+  .hero { background: var(--guide); color: var(--on-guide); padding: 40px 0 0; overflow: hidden; }
+  .hero .wrap { display: grid; gap: 40px; align-items: end; }
+  @media (min-width: 860px) { .hero .wrap { grid-template-columns: 1.15fr .85fr; } }
+  .hero h1 { font-size: clamp(2.4rem, 7vw, 4.25rem); }
+  .hero .lede { color: var(--on-guide-muted); font-size: clamp(1.1rem, 2.4vw, 1.35rem); }
+  .hero-copy { padding-bottom: 56px; }
+  .tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 24px; }
+  .tag {
+    border: 2px solid var(--on-guide-muted); color: var(--on-guide);
+    border-radius: 8px; padding: 3px 10px 1px; font-weight: 700; font-size: .85rem;
+    text-transform: uppercase; letter-spacing: .04em;
+  }
+  .ctas { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 32px; align-items: center; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 13px 22px 11px; border-radius: 999px; font-weight: 700; text-decoration: none;
+    transition: transform .15s ease, box-shadow .15s ease;
+  }
+  .btn:hover { transform: translateY(-1px); text-decoration: none; }
+  .btn-caution { background: var(--caution); color: var(--on-caution); }
+  .btn-caution:hover { box-shadow: 0 6px 18px rgb(0 0 0 / .25); }
+  .btn-ghost { color: var(--on-guide); border: 2px solid var(--on-guide-muted); }
+  .phone {
+    justify-self: center; width: min(320px, 78vw);
+    border: 10px solid #0F1412; border-bottom: 0; border-radius: 40px 40px 0 0;
+    background: #0F1412; box-shadow: 0 -10px 40px rgb(0 0 0 / .3);
+    aspect-ratio: 1080 / 1600; overflow: hidden;
+  }
+  .phone img { display: block; width: 100%; height: auto; border-radius: 30px 30px 0 0; }
+
+  /* Steps */
+  .steps { display: grid; gap: 16px; margin-top: 40px; counter-reset: step; }
+  @media (min-width: 760px) { .steps { grid-template-columns: repeat(3, 1fr); } }
+  .steps .inner { height: 100%; display: flex; flex-direction: column; gap: 10px; }
+  .shield {
+    width: 48px; height: 48px; display: grid; place-items: center;
+    background: var(--on-guide); color: var(--guide); border-radius: 10px;
+    font-weight: 800; font-size: 1.5rem; padding-top: 3px;
+  }
+  .steps p { color: var(--on-guide-muted); }
+
+  /* Features */
+  .features { display: grid; gap: 28px 40px; margin-top: 40px; }
+  @media (min-width: 760px) { .features { grid-template-columns: 1fr 1fr; } }
+  .feature { display: grid; grid-template-columns: 40px 1fr; gap: 14px; }
+  .feature svg { width: 40px; height: 40px; color: var(--accent); }
+  .feature p { color: var(--muted); margin-top: 4px; }
+
+  /* Compare */
+  .alt { background: var(--surface); }
+  .table-scroll { overflow-x: auto; margin-top: 32px; border-radius: 16px; border: 1px solid var(--outline); background: var(--bg); }
+  table { border-collapse: collapse; width: 100%; min-width: 620px; font-size: .98rem; }
+  th, td { text-align: left; vertical-align: top; padding: 14px 18px; border-bottom: 1px solid var(--outline); }
+  tr:last-child td { border-bottom: 0; }
+  thead th { background: var(--guide); color: var(--on-guide); font-weight: 700; }
+  thead th a { color: var(--on-guide); }
+  tbody th { font-weight: 600; color: var(--muted); width: 22%; }
+  .pick { display: grid; gap: 16px; margin-top: 24px; }
+  @media (min-width: 760px) { .pick { grid-template-columns: 1fr 1fr; } }
+  .pick > div { background: var(--bg); border-radius: 16px; padding: 20px 22px; border-left: 6px solid var(--guide); }
+  .pick p { color: var(--muted); margin-top: 6px; }
+
+  /* Install */
+  .install { display: grid; gap: 24px; margin-top: 40px; }
+  @media (min-width: 860px) { .install { grid-template-columns: 1fr 1fr; } }
+  .card { background: var(--surface); border-radius: 20px; padding: 28px; }
+  .card p { color: var(--muted); margin-top: 8px; }
+  .card ol { margin: 12px 0 0; padding-left: 1.3em; color: var(--muted); }
+  .card li + li { margin-top: 8px; }
+  .card strong { color: var(--text); }
+  .badge-row { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-top: 20px; }
+  .badge-row img { height: 56px; width: auto; }
+  .cert {
+    margin-top: 14px; background: var(--surface-high); border-radius: 12px; padding: 14px 16px;
+    font-family: "Overpass Mono", ui-monospace, monospace; font-size: .8rem; line-height: 1.5;
+    word-break: break-all; position: relative;
+  }
+  .copy {
+    margin-top: 10px; font: 700 .9rem Overpass, sans-serif; cursor: pointer;
+    background: var(--guide); color: var(--on-guide); border: 0; border-radius: 999px; padding: 8px 16px 6px;
+  }
+
+  /* Caution panel */
+  .caution-wrap { display: grid; gap: 32px; align-items: start; }
+  @media (min-width: 860px) { .caution-wrap { grid-template-columns: 200px 1fr; } }
+  .diamond {
+    width: 140px; height: 140px; margin: 20px auto; transform: rotate(45deg);
+    background: var(--caution); border-radius: 14px; display: grid; place-items: center;
+    box-shadow: inset 0 0 0 5px var(--caution), inset 0 0 0 9px var(--on-caution);
+  }
+  .diamond span { transform: rotate(-45deg); color: var(--on-caution); font-weight: 800; font-size: 4rem; padding-top: 8px; }
+  .limits { display: grid; gap: 16px; }
+  .limits li { list-style: none; background: var(--surface); border-radius: 14px; padding: 16px 20px; color: var(--muted); }
+  .limits strong { color: var(--text); display: block; margin-bottom: 2px; }
+  .limits ul { padding: 0; margin: 0; display: grid; gap: 12px; }
+
+  /* Under the hood */
+  details {
+    background: var(--surface); border-radius: 14px; padding: 0 20px; margin-top: 12px;
+  }
+  summary { cursor: pointer; padding: 16px 0; font-weight: 700; font-size: 1.05rem; }
+  details[open] summary { border-bottom: 1px solid var(--outline); margin-bottom: 14px; }
+  details > div { padding-bottom: 18px; color: var(--muted); }
+  details ul { padding-left: 1.2em; margin: 8px 0 0; }
+  details li + li { margin-top: 6px; }
+
+  footer { background: var(--guide); color: var(--on-guide-muted); padding: 40px 0; margin-top: 40px; }
+  footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 20px; align-items: center; }
+  footer a { color: var(--on-guide); }
+  footer .links { display: flex; flex-wrap: wrap; gap: 20px; font-weight: 600; }
+
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    .btn { transition: none; }
+  }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="bridge" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+    <path stroke-width="2.4" d="M2 15H22M7 5V18.5M17 5V18.5"/>
+    <path stroke-width="1.5" d="M7 5Q12 15 17 5M2 11.5Q5 9.5 7 5M17 5Q19 9.5 22 11.5"/>
+    <path stroke-width="1" d="M9.5 10V15M12 10.6V15M14.5 10V15"/>
+  </symbol>
+</svg>
+
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="#"><svg aria-hidden="true"><use href="#bridge"/></svg>CarBridge</a>
+    <nav class="links" aria-label="Sections">
+      <a class="opt" href="#how">How it works</a>
+      <a class="opt" href="#limits">Limits</a>
+      <a href="#install">Install</a>
+      <a href="https://github.com/jmwerk/CarBridge">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+  <section class="hero" aria-labelledby="hero-title">
+    <div class="wrap">
+      <div class="hero-copy">
+        <h1 id="hero-title">Put your phone's apps on your car's screen.</h1>
+        <p class="lede">CarBridge makes a car copy of an app you already have, so Android Auto lists it and
+          shows its full interface on your car's display. Use it while parked, or let passengers use it.</p>
+        <div class="tags">
+          <span class="tag">Free &amp; open source</span>
+          <span class="tag">No computer</span>
+          <span class="tag">No account</span>
+          <span class="tag">No telemetry</span>
+        </div>
+        <div class="ctas">
+          <a class="btn btn-caution" href="#install">Get CarBridge</a>
+          <a class="btn btn-ghost" href="https://github.com/jmwerk/CarBridge">View source</a>
+        </div>
+      </div>
+      <div class="phone">
+        <img src="img/screenshot.png" width="1080" height="1975"
+             alt="CarBridge home screen: Android Auto is set up; three apps on your car, one with an update ready; and a list of apps to add.">
+      </div>
+    </div>
+  </section>
+
+  <section id="how" aria-labelledby="how-title">
+    <div class="wrap">
+      <h2 id="how-title">Three steps, all on your phone</h2>
+      <p class="lede">Patching, signing and installing happen on the device. The original app and its data are never touched.</p>
+      <ol class="steps" role="list" style="list-style:none;padding:0;margin-top:40px">
+        <li class="sign"><div class="inner">
+          <div class="shield" aria-hidden="true">1</div>
+          <h3>Pick an app</h3>
+          <p>Tap <strong>Add</strong> next to any app you've installed, including Play Store apps split into several files.</p>
+        </div></li>
+        <li class="sign"><div class="inner">
+          <div class="shield" aria-hidden="true">2</div>
+          <h3>Approve one prompt</h3>
+          <p>Confirm Android's install prompt. The copy appears next to the original as "<em>App</em> (Car)" with a bridge badge.</p>
+        </div></li>
+        <li class="sign"><div class="inner">
+          <div class="shield" aria-hidden="true">3</div>
+          <h3>Reconnect Android Auto</h3>
+          <p>Open the car launcher. The copy is there, running its full phone interface on the car display.</p>
+        </div></li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="alt" aria-labelledby="features-title">
+    <div class="wrap">
+      <h2 id="features-title">Made to stay out of your way</h2>
+      <div class="features">
+        <div class="feature">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10v4M18 10v4"/></svg>
+          <div><h3>Fills the wide car screen</h3>
+            <p>Copies stretch to the car display, even apps locked to portrait. Keep the portrait layout per app if you prefer.</p></div>
+        </div>
+        <div class="feature">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>
+          <div><h3>Knows when a copy is out of date</h3>
+            <p>CarBridge notifies you when the original updates, and can update every copy in one go, often without a prompt.</p></div>
+        </div>
+        <div class="feature">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4M12 17h.01"/></svg>
+          <div><h3>Warns before it wastes your time</h3>
+            <p>Hides apps that already work in Android Auto, and flags apps likely to refuse to run as a copy.</p></div>
+        </div>
+        <div class="feature">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+          <div><h3>Your key stays on your phone</h3>
+            <p>Copies are signed with a key held in Android's secure Keystore. No accounts, no license server, no telemetry.</p></div>
+        </div>
+        <div class="feature">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+          <div><h3>Handles big apps</h3>
+            <p>Single and split APKs, large browsers and Unity games. Patching keeps running if you leave the app.</p></div>
+        </div>
+        <div class="feature">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M11 18h2"/></svg>
+          <div><h3>Open copies on the phone too</h3>
+            <p>Copies start empty, so tap one in CarBridge to open it on your phone and sign in before you drive off.</p></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="compare" aria-labelledby="compare-title">
+    <div class="wrap">
+      <h2 id="compare-title">CarBridge app or CarBridge Patches?</h2>
+      <p class="lede">Both put an app's full interface on the Android Auto screen using the same rules. They differ in what they do to the app.</p>
+      <div class="table-scroll" tabindex="0" role="region" aria-label="Comparison of the CarBridge app and CarBridge Patches">
+        <table>
+          <thead><tr><th scope="col"><span class="skip">Aspect</span></th>
+            <th scope="col">CarBridge app</th>
+            <th scope="col"><a href="https://github.com/jmwerk/carbridge-patches">CarBridge Patches</a> for Morphe</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">What you get</th><td>A separate copy, "<em>App</em> (Car)", next to the original</td><td>The patched app; no extra car copy</td></tr>
+            <tr><th scope="row">Original app</th><td>Untouched; keeps updating from its store</td><td>Replaced, unless Morphe gives it its own package name (as for YouTube)</td></tr>
+            <tr><th scope="row">Data and sign-in</th><td>The copy starts empty; sign in again</td><td>Kept when the patched build replaces the original</td></tr>
+            <tr><th scope="row">Works with</th><td>Almost any installed app, including Play Store split APKs</td><td>Apps you patch in Morphe Manager, from an APK you provide</td></tr>
+            <tr><th scope="row">Other patches</th><td>No</td><td>Yes, e.g. Morphe's YouTube patches</td></tr>
+            <tr><th scope="row">After updates</th><td>CarBridge notifies you; tap <strong>Update</strong></td><td>Repatch in Morphe Manager</td></tr>
+            <tr><th scope="row">You need</th><td>Only the phone</td><td>Morphe Manager</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pick">
+        <div><h3>Use the CarBridge app</h3>
+          <p>For store apps you don't otherwise modify, like games, browsers and video apps. Quickest route, and it never touches the original.</p></div>
+        <div><h3>Use CarBridge Patches</h3>
+          <p>For apps you already patch with Morphe, or when you want one patched app instead of an original plus a copy.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="install" class="alt" aria-labelledby="install-title">
+    <div class="wrap">
+      <h2 id="install-title">Install</h2>
+      <p class="lede">Requires Android 15 or newer. CarBridge's setup card walks you through turning on Android Auto's developer mode.</p>
+      <div class="install">
+        <div class="card">
+          <h3>Get the app</h3>
+          <p><a href="https://github.com/ImranR98/Obtainium">Obtainium</a> installs CarBridge from this repo's GitHub releases and keeps it updated.
+            Or download the APK directly.</p>
+          <div class="badge-row">
+            <a href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://add/https://github.com/jmwerk/CarBridge">
+              <img src="https://raw.githubusercontent.com/ImranR98/Obtainium/main/assets/graphics/badge_obtainium.png" alt="Get it on Obtainium" width="161" height="56"></a>
+            <a class="btn btn-caution" href="https://github.com/jmwerk/CarBridge/releases/latest">Download APK</a>
+          </div>
+          <p style="margin-top:20px">Verify the install with <a href="https://github.com/soupslurpr/AppVerifier">AppVerifier</a> by copying this into it:</p>
+          <div class="cert" id="cert">org.carbridge<br>A4:68:93:60:A9:1A:49:B1:6F:A7:B1:50:DC:FC:6E:2B:89:21:1A:CD:B9:63:B5:5F:1B:15:70:4A:DA:43:CC:7F</div>
+          <button class="copy" type="button" data-copy="cert">Copy</button>
+        </div>
+        <div class="card">
+          <h3>Set up Android Auto</h3>
+          <ol>
+            <li>Open <strong>Android Auto settings</strong> and tap <strong>Version</strong> ten times to unlock developer mode.</li>
+            <li>Tap <strong>⋮ → Developer settings</strong> and turn on <strong>Unknown sources</strong>.</li>
+            <li>In CarBridge, tap <strong>Add</strong> next to an app and confirm the install prompt.</li>
+            <li>Reconnect Android Auto. Your copy is in the car launcher.</li>
+          </ol>
+          <p style="margin-top:20px"><strong>Dev builds:</strong> every push to <code>dev</code> publishes a pre-release,
+            CarBridge Dev (<code>org.carbridge.dev</code>), which installs next to CarBridge. In Obtainium, add the repo again with
+            <em>Include prereleases</em> on and the title filter set to <code>Dev</code>. Use one of the two apps per copied app.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="limits" aria-labelledby="limits-title">
+    <div class="wrap caution-wrap">
+      <div class="diamond" aria-hidden="true"><span>!</span></div>
+      <div>
+        <h2 id="limits-title">Honest about the limits</h2>
+        <p class="lede">CarBridge re-signs the copy. Some apps won't accept that, and some things can't be fixed from outside the app.</p>
+        <div class="limits" style="margin-top:28px">
+          <ul>
+            <li><strong>Drive safely</strong>Car use is for passengers or while parked.</li>
+            <li><strong>Some apps refuse to run</strong>Apps that check Play Integrity, their own signature or a license may not work as a copy.</li>
+            <li><strong>Copies start fresh</strong>A copy has no data from the original. Sign in again.</li>
+            <li><strong>The key lives with CarBridge</strong>If you uninstall CarBridge or clear its data, existing copies can't be updated and need to be added again.</li>
+            <li><strong>Respect licenses</strong>Only copy apps whose license allows modification, and never share the copies.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="alt" aria-labelledby="hood-title">
+    <div class="wrap">
+      <h2 id="hood-title">Under the hood</h2>
+      <p class="lede">For the curious. Verified on a Galaxy S24 Ultra (Android 17, Android Auto 17.9) with VLC, Firefox, GitHub, a Unity game and Morphe YouTube.</p>
+      <details>
+        <summary>Why not just launch the app on the car display?</summary>
+        <div><p>Each car app gets its own virtual display, and Android's window policy rejects any other app's activity on it
+          (<code>Activity launch disallowed by policy</code>), whatever the caller's permissions. So CarBridge patches a copy instead.</p></div>
+      </details>
+      <details>
+        <summary>What changes in the copy?</summary>
+        <div>
+          <p>Android Auto shows an ordinary activity when the app declares:</p>
+          <ul>
+            <li><code>com.google.android.gms.car.application</code> meta-data pointing to an automotive app descriptor</li>
+            <li><code>CAR_LAUNCHER</code>, <code>androidx.car.app.category.NAVIGATION</code> and <code>APP_MAPS</code> on the launcher activity</li>
+            <li>The <code>ACCESS_SURFACE</code> and <code>MAP_TEMPLATES</code> permissions</li>
+          </ul>
+          <p style="margin-top:10px">The copy is renamed to <code>&lt;package&gt;.car</code>, with provider authorities, permissions and the
+            resource table renamed to match. Media and car-app service filters are stripped so Android Auto doesn't fall back to its template UI.
+            Split APKs are signed with the same key and installed in one session.</p>
+        </div>
+      </details>
+      <details>
+        <summary>Credits and license</summary>
+        <div><p>CarBridge is original GPL-3.0 software. The car-visibility entries come from AABrowser (GPL-3.0).
+          APK editing uses ARSCLib and signing uses apksig. Full details are in the
+          <a href="https://github.com/jmwerk/CarBridge#readme">README</a>.</p></div>
+      </details>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <a class="brand" href="#" style="color:var(--on-guide)"><svg aria-hidden="true"><use href="#bridge"/></svg>CarBridge</a>
+    <div class="links">
+      <a href="https://github.com/jmwerk/CarBridge">Source</a>
+      <a href="https://github.com/jmwerk/CarBridge/releases">Releases</a>
+      <a href="https://github.com/jmwerk/CarBridge/issues">Issues</a>
+      <a href="https://buymeacoffee.com/jmwerk">Buy me a coffee</a>
+    </div>
+    <p>GPL-3.0. Not affiliated with Google or Android Auto.</p>
+  </div>
+</footer>
+
+<script>
+  document.querySelectorAll('[data-copy]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const text = document.getElementById(btn.dataset.copy).innerText.trim();
+      try {
+        await navigator.clipboard.writeText(text);
+        btn.textContent = 'Copied';
+      } catch {
+        btn.textContent = 'Select and copy manually';
+      }
+      setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
+    });
+  });
+</script>
+</body>
+</html>
