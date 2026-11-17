@@ -4,6 +4,7 @@ import org.carbridge.core.CarOptions
 
 import android.content.Context
 import android.content.pm.ApplicationInfo
+import android.os.storage.StorageManager
 import com.reandroid.apk.ApkModule
 import com.reandroid.archive.writer.ZipAligner
 import java.io.File
@@ -24,7 +25,9 @@ class PatchPipeline(private val context: Context, private val log: (String) -> U
         log("Reading ${total / MB} MB in ${splits.size + 1} APK(s)")
         // Unsigned and signed copies sit side by side while signing
         val needed = total * 2 + 64 * MB
-        val free = work.usableSpace
+        // Includes cache Android would clear to make room, unlike File.usableSpace
+        val storage = context.getSystemService(StorageManager::class.java)
+        val free = storage.getAllocatableBytes(storage.getUuidForPath(work))
         if (free < needed) {
             throw PatchFailure("Not enough free space: needs about ${needed / MB} MB, ${free / MB} MB free.")
         }
