@@ -42,8 +42,13 @@ re-sign the app.
 [Obtainium](https://github.com/ImranR98/Obtainium) installs and updates CarBridge from this repo's
 GitHub releases. Or download the APK from [Releases](https://github.com/jmwerk/CarBridge/releases).
 
-Release APKs are signed with certificate SHA-256
-`a4:68:93:60:a9:1a:49:b1:6f:a7:b1:50:dc:fc:6e:2b:89:21:1a:cd:b9:63:b5:5f:1b:15:70:4a:da:43:cc:7f`.
+Verify the installed app with [AppVerifier](https://github.com/soupslurpr/AppVerifier) by copying
+this block into it:
+
+```
+org.carbridge
+A4:68:93:60:A9:1A:49:B1:6F:A7:B1:50:DC:FC:6E:2B:89:21:1A:CD:B9:63:B5:5F:1B:15:70:4A:DA:43:CC:7F
+```
 
 ### Dev builds
 
@@ -51,6 +56,12 @@ Every push to the `dev` branch publishes a pre-release, **CarBridge Dev** (`org.
 which installs next to CarBridge. In Obtainium, add this repo again with **Include prereleases**
 on and **Filter release titles by regular expression** set to `Dev`. Dev builds may be unstable.
 Both apps make the same `<package>.car` copies with different keys, so use one of them per app.
+Dev builds are signed with the same key; verify them with:
+
+```
+org.carbridge.dev
+A4:68:93:60:A9:1A:49:B1:6F:A7:B1:50:DC:FC:6E:2B:89:21:1A:CD:B9:63:B5:5F:1B:15:70:4A:DA:43:CC:7F
+```
 
 ## Requirements
 
