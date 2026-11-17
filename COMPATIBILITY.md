@@ -1,8 +1,9 @@
 # Compatibility
 
 Apps confirmed on a Galaxy S24 Ultra (Android 17, Android Auto 17.9) with the Desktop Head Unit,
-November 2026. Other versions and phones may behave differently. To add a result, open an issue
-or a pull request with the app, its version, what you used and what happened.
+November 2026. Other versions and phones may behave differently. To add a result, tap ⋮ → **Report how it works** on the car copy in CarBridge, which opens a
+prefilled GitHub issue, or open an issue or pull request with the app, its version, what you used
+and what happened.
 
 ## CarBridge app
 
