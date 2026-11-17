@@ -1,3 +1,6 @@
+# Shizuku creates the shell-side helper by class name
+-keep class org.carbridge.ShellService { <init>(...); }
+
 # apksig and ARSCLib reference JDK/desktop classes that don't exist on Android
 -dontwarn javax.**
 -dontwarn java.awt.**

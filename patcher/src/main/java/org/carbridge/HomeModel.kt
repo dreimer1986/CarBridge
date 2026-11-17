@@ -20,6 +20,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.carbridge.core.CarOptions
 import org.carbridge.patch.ApkImport
+import rikka.shizuku.Shizuku
 import org.carbridge.patch.BackupFailure
 import org.carbridge.patch.ImportFailure
 import org.carbridge.patch.KeyBackup
@@ -76,6 +77,24 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
         private set
     var autoUpdate by mutableStateOf(AutoUpdate.isEnabled(app))
         private set
+    var shizuku by mutableStateOf(ShizukuMode.state(app))
+        private set
+    var useShizuku by mutableStateOf(ShizukuMode.isEnabled(app))
+        private set
+    private val shizukuChanged = Shizuku.OnBinderReceivedListener { shizuku = ShizukuMode.state(app) }
+    private val shizukuGone = Shizuku.OnBinderDeadListener { shizuku = ShizukuMode.state(app) }
+    private val shizukuAnswered = Shizuku.OnRequestPermissionResultListener { _, _ ->
+        shizuku = ShizukuMode.state(app)
+        if (shizuku == ShizukuMode.State.Ready) switchShizuku(true)
+    }
+
+    fun switchShizuku(on: Boolean) {
+        ShizukuMode.setEnabled(getApplication(), on)
+        useShizuku = on
+    }
+
+    /** Asks Shizuku for access; the answer turns Shizuku installs on. */
+    fun allowShizuku() = ShizukuMode.requestPermission()
 
     /** The label of a copy the background job is rebuilding, or null. */
     var backgroundBuild by mutableStateOf<String?>(null)
@@ -95,6 +114,9 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
     val notificationPrompt = _notificationPrompt.receiveAsFlow()
 
     init {
+        Shizuku.addBinderReceivedListenerSticky(shizukuChanged)
+        Shizuku.addBinderDeadListener(shizukuGone)
+        Shizuku.addRequestPermissionResultListener(shizukuAnswered)
         viewModelScope.launch {
             CopyBuilder.building.collect { pkg ->
                 // The screen's own builds already show their progress
@@ -215,6 +237,7 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
     fun refresh() {
         sample?.let { setup = Setup(canInstall = true, developerMode = true, unknownSources = true); catalog = it; return }
         setup = readSetup()
+        shizuku = ShizukuMode.state(getApplication())
         viewModelScope.launch {
             val (loaded, backed) = withContext(Dispatchers.IO) {
                 AppCatalog.load(getApplication(), ::carOptions) to KeystoreSigner(getApplication()).hasBackup()
@@ -467,6 +490,9 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
     }
 
     override fun onCleared() {
+        Shizuku.removeBinderReceivedListener(shizukuChanged)
+        Shizuku.removeBinderDeadListener(shizukuGone)
+        Shizuku.removeRequestPermissionResultListener(shizukuAnswered)
         // The patch runs in viewModelScope, which is cancelled with the model
         PatchService.stop(getApplication())
     }

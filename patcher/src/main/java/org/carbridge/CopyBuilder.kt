@@ -35,7 +35,9 @@ object CopyBuilder {
         try {
             val apks = PatchPipeline(context, log).patch(app, options(context, app.packageName))
             onPatched()
-            Installer.install(context, apks, carPackage, background)
+            if (!ShizukuMode.install(context, apks, carPackage, background, log)) {
+                Installer.install(context, apks, carPackage, background)
+            }
         } finally {
             // The install session holds its own copy once committed
             PatchPipeline.clearWork(context)

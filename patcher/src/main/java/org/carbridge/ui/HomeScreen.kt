@@ -1,5 +1,7 @@
 package org.carbridge.ui
 
+import org.carbridge.ShizukuMode
+import androidx.compose.ui.platform.LocalUriHandler
 import android.content.ClipData
 import android.content.ClipDescription
 import android.content.ClipboardManager
@@ -416,6 +418,10 @@ fun HomeScreen(model: HomeModel, actions: HomeActions) {
                 backedUp = model.backedUp,
                 onBackUp = { showSettings = false; model.startBackup() },
                 onRestore = { showSettings = false; actions.pickBackup() },
+                shizuku = model.shizuku,
+                useShizuku = model.useShizuku,
+                onUseShizuku = model::switchShizuku,
+                onAllowShizuku = model::allowShizuku,
             )
         }
     }
@@ -1076,6 +1082,10 @@ private fun Settings(
     backedUp: Boolean,
     onBackUp: () -> Unit,
     onRestore: () -> Unit,
+    shizuku: ShizukuMode.State,
+    useShizuku: Boolean,
+    onUseShizuku: (Boolean) -> Unit,
+    onAllowShizuku: () -> Unit,
 ) {
     Column(
         Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
@@ -1108,6 +1118,45 @@ private fun Settings(
                 FilledTonalButton(onClick = onBackUp) { Text(if (backedUp) "Back up again" else "Back up key") }
                 OutlinedButton(onClick = onRestore) { Text("Restore backup") }
             }
+        }
+        ShizukuSetting(shizuku, useShizuku, onUseShizuku, onAllowShizuku)
+    }
+}
+
+@Composable
+private fun ShizukuSetting(state: ShizukuMode.State, on: Boolean, onSwitch: (Boolean) -> Unit, onAllow: () -> Unit) {
+    val context = LocalContext.current
+    val uri = LocalUriHandler.current
+    val title = "Install with Shizuku"
+    val what = "Copies install without asking, even the first time, and get the permissions the original app has."
+    when (state) {
+        ShizukuMode.State.Ready -> Row(
+            Modifier.fillMaxWidth().toggleable(value = on, role = Role.Switch, onValueChange = onSwitch),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) { AboutItem(title, what) }
+            Spacer(Modifier.width(12.dp))
+            Switch(checked = on, onCheckedChange = null)
+        }
+        else -> Column {
+            AboutItem(
+                title,
+                what + " " + when (state) {
+                    ShizukuMode.State.NotInstalled -> "For advanced users: needs the Shizuku app."
+                    ShizukuMode.State.NotRunning ->
+                        "Shizuku isn't running. Start it in the Shizuku app; after a restart of your phone it must be started again." +
+                            if (on) " Until then, CarBridge asks before installing as usual." else ""
+                    else -> "Shizuku is running. Allow CarBridge to use it."
+                },
+            )
+            val (label, action) = when (state) {
+                ShizukuMode.State.NotInstalled -> "Get Shizuku" to { uri.openUri("https://shizuku.rikka.app/") }
+                ShizukuMode.State.NotRunning -> "Open Shizuku" to {
+                    context.packageManager.getLaunchIntentForPackage(ShizukuMode.PACKAGE)?.let(context::startActivity) ?: Unit
+                }
+                else -> "Allow CarBridge" to onAllow
+            }
+            OutlinedButton(onClick = action, modifier = Modifier.padding(top = 12.dp)) { Text(label) }
         }
     }
 }
