@@ -47,6 +47,13 @@ Or download the APK from [Releases](https://github.com/jmwerk/CarBridge/releases
 Release APKs are signed with certificate SHA-256
 `a4:68:93:60:a9:1a:49:b1:6f:a7:b1:50:dc:fc:6e:2b:89:21:1a:cd:b9:63:b5:5f:1b:15:70:4a:da:43:cc:7f`.
 
+### Dev builds
+
+Every push to the `dev` branch publishes a pre-release, **CarBridge Dev** (`org.carbridge.dev`),
+which installs next to CarBridge. In Obtainium, add this repo again with **Include prereleases**
+on and **Filter release titles by regular expression** set to `Dev`. Dev builds may be unstable.
+Both apps make the same `<package>.car` copies with different keys, so use one of them per app.
+
 ## Requirements
 
 - Android 15+ phone with USB debugging on

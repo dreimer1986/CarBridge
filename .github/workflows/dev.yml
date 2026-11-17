@@ -1,0 +1,77 @@
+# Publishes every push to the dev branch as a GitHub pre-release of "CarBridge Dev"
+# (org.carbridge.dev), which installs next to the release build. Uses the release signing
+# secrets, like release.yml. Keeps the newest few dev pre-releases and deletes older ones.
+name: Dev build
+
+on:
+  push:
+    branches: [dev]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: dev-build
+  cancel-in-progress: true
+
+jobs:
+  dev:
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_CERT_SHA256: a4689360a91a49b16fa7b150dcfc6e2b89211acdb963b55f1b15704ada43cc7f
+      KEEP: 5
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: Restore release key
+        env:
+          CARBRIDGE_KEYSTORE: ${{ secrets.CARBRIDGE_KEYSTORE }}
+        run: |
+          [ -n "$CARBRIDGE_KEYSTORE" ] || { echo "CARBRIDGE_KEYSTORE secret missing" >&2; exit 1; }
+          echo "$CARBRIDGE_KEYSTORE" | base64 -d > "$RUNNER_TEMP/release.jks"
+
+      - name: Test and build
+        env:
+          ORG_GRADLE_PROJECT_CARBRIDGE_STORE_FILE: ${{ runner.temp }}/release.jks
+          ORG_GRADLE_PROJECT_CARBRIDGE_STORE_PASSWORD: ${{ secrets.CARBRIDGE_STORE_PASSWORD }}
+          ORG_GRADLE_PROJECT_CARBRIDGE_KEY_ALIAS: ${{ secrets.CARBRIDGE_KEY_ALIAS }}
+          ORG_GRADLE_PROJECT_CARBRIDGE_KEY_PASSWORD: ${{ secrets.CARBRIDGE_KEY_PASSWORD }}
+        run: ./gradlew --no-daemon :core:test :patcher:testDevUnitTest :patcher:assembleDev -PdevBuild=${{ github.run_number }}
+
+      # Obtainium can't update across signing keys, so never ship a debug-signed fallback
+      - name: Verify signing certificate
+        run: |
+          apksigner="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)/apksigner"
+          cert=$("$apksigner" verify --print-certs patcher/build/outputs/apk/dev/patcher-dev.apk \
+            | sed -n 's/.*certificate SHA-256 digest: //p' | head -1)
+          [ "$cert" = "$RELEASE_CERT_SHA256" ] || { echo "APK not signed with the release key ($cert)" >&2; exit 1; }
+
+      - name: Publish pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="$(sed -n 's/.*versionName = "\(.*\)".*/\1/p' patcher/build.gradle.kts)-dev.${{ github.run_number }}"
+          out="CarBridge-Dev-$version.apk"
+          cp patcher/build/outputs/apk/dev/patcher-dev.apk "$out"
+          gh release create "v$version" "$out" --target "$GITHUB_SHA" --prerelease --latest=false \
+            --title "CarBridge Dev $version" \
+            --notes "Development build of \`dev\` at $GITHUB_SHA. Installs as CarBridge Dev next to CarBridge; may be unstable."
+
+      - name: Delete older dev pre-releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release list --limit 100 --json tagName,isPrerelease,createdAt \
+            --jq '[.[] | select(.isPrerelease and (.tagName | contains("-dev.")))] | sort_by(.createdAt) | reverse | .[($ENV.KEEP | tonumber):] | .[].tagName' \
+            | while read -r tag; do gh release delete "$tag" --yes --cleanup-tag; done
+
+      - name: Remove key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release.jks"

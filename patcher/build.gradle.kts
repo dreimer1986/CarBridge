@@ -50,6 +50,12 @@ android {
             // Without the release key (e.g. a fresh clone), fall back to debug signing for local tests
             signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
+        // Pre-release builds from the dev branch; install next to the release build as "CarBridge Dev"
+        create("dev") {
+            initWith(getByName("release"))
+            applicationIdSuffix = ".dev"
+            matchingFallbacks += "release"
+        }
     }
 
     packaging {
@@ -59,6 +65,17 @@ android {
 
 kotlin {
     jvmToolchain(17)
+}
+
+// Each dev build needs a higher versionCode to update in place: -PdevBuild=<CI run number>
+val devBuild = providers.gradleProperty("devBuild").map(String::toInt).orElse(0)
+androidComponents {
+    onVariants(selector().withBuildType("dev")) { variant ->
+        variant.outputs.forEach { output ->
+            output.versionCode.set(devBuild)
+            output.versionName.set(devBuild.map { "${android.defaultConfig.versionName}-dev.$it" })
+        }
+    }
 }
 
 dependencies {
