@@ -2,6 +2,7 @@ package org.carbridge.patch
 
 import com.android.apksig.ApkSigner
 import com.android.apksig.ApkVerifier
+import com.android.apksig.SigningCertificateLineage
 import java.io.File
 import java.security.MessageDigest
 import java.security.PrivateKey
@@ -11,19 +12,39 @@ import java.security.cert.X509Certificate
 object ApkSigning {
     private const val PAGE_16K = 16 * 1024
 
-    fun sign(input: File, output: File, minSdk: Int, key: PrivateKey, cert: X509Certificate) {
+    /** The oldest Android a car copy installs on: CarBridge's own minSdk. */
+    const val COPY_MIN_SDK = 35
+
+    /**
+     * Signs with [key]. With a [lineage] ending in [cert], the copy updates copies signed by any
+     * older key in it, even when this phone no longer holds those keys.
+     */
+    fun sign(
+        input: File,
+        output: File,
+        minSdk: Int,
+        key: PrivateKey,
+        cert: X509Certificate,
+        lineage: SigningCertificateLineage? = null,
+    ) {
         val signer = ApkSigner.SignerConfig.Builder("CarBridge", key, listOf(cert)).build()
-        ApkSigner.Builder(listOf(signer))
+        val builder = ApkSigner.Builder(listOf(signer))
             .setInputApk(input)
             .setOutputApk(output)
-            .setMinSdkVersion(minSdk)
-            .setV1SigningEnabled(minSdk < 24)
-            .setV2SigningEnabled(true)
             .setV3SigningEnabled(true)
             .setLibraryPageAlignmentBytes(PAGE_16K)
             .setCreatedBy("CarBridge")
-            .build()
-            .sign()
+        if (lineage == null) {
+            builder.setMinSdkVersion(minSdk).setV1SigningEnabled(minSdk < 24).setV2SigningEnabled(true)
+        } else {
+            // v1 and v2 are signed by the lineage's oldest key, which a restored phone doesn't have
+            builder.setMinSdkVersion(COPY_MIN_SDK)
+                .setMinSdkVersionForRotation(28)
+                .setSigningCertificateLineage(lineage)
+                .setV1SigningEnabled(false)
+                .setV2SigningEnabled(false)
+        }
+        builder.build().sign()
     }
 
     /** Problems Android's installer would find in [apk]; empty when it verifies and [cert] signed it. */
