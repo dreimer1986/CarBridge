@@ -22,7 +22,8 @@ prompt, and finds it in the car launcher, without a computer.
 ## Positioning
 
 Free and open source (GPL-3.0), no accounts, no license server, no telemetry. All patching and
-signing happens on the phone with a key that never leaves the device's Keystore.
+signing happens on the phone with a Keystore key that never leaves the device. An optional key
+backup exists only in a file the user saves, sealed with a recovery code shown once.
 
 ## Operating Context
 
@@ -38,8 +39,9 @@ signing happens on the phone with a key that never leaves the device's Keystore.
 - Car copies install next to the original as `<package>.car`; the original and its data are untouched.
 - Supports single and split APKs.
 - Apps that check Play Integrity, their own signature or a license may refuse to run after patching.
-- The on-device signing key is lost if CarBridge is uninstalled or its data cleared; existing car
-  copies then need uninstalling and re-patching.
+- The on-device signing key is lost if CarBridge is uninstalled or its data cleared. With a key
+  backup, existing copies update again after a restore; without one, they need uninstalling and
+  re-patching.
 - Only apps whose license allows modification should be patched; patched APKs must not be shared.
 - Driving safety: car use is for passengers or while parked.
 - minSdk 35 (Android 15+).

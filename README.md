@@ -97,6 +97,7 @@ Google Play's copy protection (`com.pairip.licensecheck`), and points Morphe-pat
 | Edit the binary manifest and resources | `patch/ManifestPatcher.kt` | ARSCLib 1.4.0 (Apache-2.0) |
 | Label and icon | `patch/IconBadger.kt` | Draws the original icon plus the badge on the phone |
 | Sign | `patch/KeystoreSigner.kt` | apksig 9.5.1 (Apache-2.0); RSA-3072 key in the Android Keystore, 16 KB native-lib alignment |
+| Key backup | `patch/KeyBackup.kt` | Backup key plus v3 rotation lineage, sealed with a recovery code; see [Key backup](#key-backup) |
 | Install | `Installer.kt` | `PackageInstaller` session; the user confirms new copies, and updates when Android requires it |
 
 A JVM check of the patch against a real APK, or a directory of `base.apk` + `split_*.apk`,
@@ -167,8 +168,34 @@ Any activity of the patched package may then run on its car display, not just th
 - Activity aliases keep the original package prefix, so apps that build alias names from
   `getPackageName()` can't switch them. Morphe YouTube shows a harmless
   `CustomBrandingPatch: setBranding failure` toast because of this.
-- The signing key dies with CarBridge's data. After an uninstall or a data clear, existing car
-  copies can't be updated in place.
+- Copies made before a user's first key backup, on a phone that has since lost its key, can't be
+  recovered: the lost key is needed to vouch for the backup key.
+
+## Key backup
+
+Copies are signed with a non-exportable Keystore key, which dies with CarBridge's data. To survive
+that, **Back up** (a card once a copy exists, or About) makes a second RSA-3072 key in software and
+has the Keystore key sign an APK Signature Scheme v3 rotation lineage to it. The backup key,
+its certificate (`patch/SelfSignedCertificate.kt`) and the lineage go into a `.cbkey` file
+encrypted with AES-256-GCM under a PBKDF2 key from a 24-character recovery code shown once. The
+backup key isn't kept on the phone; the Keystore key keeps signing copies as before.
+
+After a reinstall or data clear, CarBridge flags copies it can't update and offers **Restore
+backup**. The backup key is imported into the Keystore, and from then on copies are signed with it
+plus the lineage, which Android accepts as an update of copies signed by the lost key. Rotated
+copies are v3 only, since v1 and v2 would need the lost key; copies only install on Android 15+.
+
+- Android checks updates against a copy's current signer, and won't roll back: once a copy is
+  signed with the backup key, only that key updates it. `KeystoreSigner.choose` picks per copy.
+- The same file keeps working after a second loss, since it holds the key now in use.
+- Anyone with the file and code can sign updates to the user's copies, so the UI says to keep
+  both off the phone.
+- Copies installed by another CarBridge build still on the phone (CarBridge Dev) aren't flagged
+  as lost.
+
+Verified on 2026-11-17 on the S24 Ultra (Android 17) with a minimal test package: the Keystore key
+signs the lineage, the backup key imports into Keystore, and the rotated update installs in place
+without a prompt.
 
 ## Release signing
 
