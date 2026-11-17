@@ -51,7 +51,12 @@ data class CarCopy(
     val options: CarOptions,
     /** Signed with a key this phone no longer has; it must be removed before it can be rebuilt. */
     val signedElsewhere: Boolean = false,
+    /** Made by another CarBridge build still on the phone, e.g. CarBridge Dev, so no key was lost. */
+    val madeByOtherCarBridge: Boolean = false,
 ) {
+    /** A key backup could make this copy updatable again. */
+    val needsRestore get() = signedElsewhere && !madeByOtherCarBridge
+
     /** True when the original app has been updated past the version this copy was made from. */
     val outdated get() = version != null && originalVersion != null && originalVersion.code > version.code
 
@@ -113,6 +118,9 @@ object AppCatalog {
                 hasMediaService = original != null && hasMediaService(pm, originalPkg),
                 options = options(originalPkg),
                 signedElsewhere = !signer.canUpdate(pm, info.packageName),
+                madeByOtherCarBridge = installer(pm, info.packageName).let { by ->
+                    by != null && by != context.packageName && (by == CARBRIDGE_ID || by.startsWith("$CARBRIDGE_ID.")) && isInstalled(pm, by)
+                },
             )
         }.sortedWith(compareBy({ !it.outdated }, { it.label.lowercase() }))
 
@@ -120,6 +128,11 @@ object AppCatalog {
         val available = sources.values.filter { it.info.packageName !in copied }.sortedBy { it.label.lowercase() }
         return Catalog(copies, available)
     }
+
+    private fun installer(pm: PackageManager, pkg: String): String? =
+        runCatching { pm.getInstallSourceInfo(pkg).installingPackageName }.getOrNull()
+
+    private fun isInstalled(pm: PackageManager, pkg: String) = runCatching { pm.getPackageInfo(pkg, 0) }.isSuccess
 
     /** User-installed apps, plus preinstalled ones a store has updated (stock YouTube, Chrome). */
     private fun isUserFacing(info: ApplicationInfo): Boolean =
@@ -170,5 +183,7 @@ object AppCatalog {
     )
     private const val PAIRIP_PREFIX = "com.pairip.licensecheck."
     private const val MORPHE_PREFIX = "app.morphe.android."
+    // CarBridge, CarBridge Dev and debug builds sign copies with different keys
+    private const val CARBRIDGE_ID = "org.carbridge"
     private const val CAR_APP_META = "com.google.android.gms.car.application"
 }
