@@ -1,5 +1,6 @@
 package org.carbridge.patch
 
+import android.content.pm.PackageManager
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import java.io.File
@@ -24,6 +25,23 @@ class KeystoreSigner {
 
     /** The certificate copies are signed with; created with the key on first use. */
     fun certificate(): X509Certificate = loadOrCreateKey().second
+
+    /** The certificate if the key exists; it's gone after CarBridge is reinstalled or its data cleared. */
+    private val existingCertificate: X509Certificate? by lazy {
+        KeyStore.getInstance(KEYSTORE).apply { load(null) }.getCertificate(ALIAS) as X509Certificate?
+    }
+
+    /**
+     * False when installed [pkg] was signed with a key this phone no longer has, so Android would
+     * refuse a rebuilt copy as an update. True when the signers can't be read, to never block.
+     */
+    fun signedHere(pm: PackageManager, pkg: String): Boolean {
+        val signers = runCatching {
+            pm.getPackageInfo(pkg, PackageManager.GET_SIGNING_CERTIFICATES).signingInfo?.apkContentsSigners
+        }.getOrNull() ?: return true
+        val cert = existingCertificate ?: return false
+        return signers.any { it.toByteArray().contentEquals(cert.encoded) }
+    }
 
     private fun loadOrCreateKey(): Pair<PrivateKey, X509Certificate> {
         val ks = KeyStore.getInstance(KEYSTORE).apply { load(null) }

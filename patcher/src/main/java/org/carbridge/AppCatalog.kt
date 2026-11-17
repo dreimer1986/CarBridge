@@ -13,6 +13,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import java.io.File
 import org.carbridge.core.CarOptions
 import org.carbridge.core.CarPatch
+import org.carbridge.patch.KeystoreSigner
 import org.carbridge.patch.PatchPipeline
 
 /** An app the user can add to the car. */
@@ -48,9 +49,14 @@ data class CarCopy(
     /** The original has a media browser service, so the audio-player choice matters. */
     val hasMediaService: Boolean,
     val options: CarOptions,
+    /** Signed with a key this phone no longer has; it must be removed before it can be rebuilt. */
+    val signedElsewhere: Boolean = false,
 ) {
     /** True when the original app has been updated past the version this copy was made from. */
     val outdated get() = version != null && originalVersion != null && originalVersion.code > version.code
+
+    /** A rebuilt copy would install over this one. */
+    val updatable get() = original != null && !signedElsewhere
 }
 
 data class Version(val code: Long, val name: String?)
@@ -91,6 +97,7 @@ object AppCatalog {
             info.packageName to info.toSource(pm, info.packageName in autoApps, caution)
         }
 
+        val signer = KeystoreSigner()
         val copies = copyInfos.map { info ->
             val originalPkg = info.packageName.removeSuffix(CAR_SUFFIX)
             val original = sources[originalPkg]
@@ -105,6 +112,7 @@ object AppCatalog {
                 portraitLocked = original != null && locksPortrait(pm, originalPkg),
                 hasMediaService = original != null && hasMediaService(pm, originalPkg),
                 options = options(originalPkg),
+                signedElsewhere = !signer.signedHere(pm, info.packageName),
             )
         }.sortedWith(compareBy({ !it.outdated }, { it.label.lowercase() }))
 

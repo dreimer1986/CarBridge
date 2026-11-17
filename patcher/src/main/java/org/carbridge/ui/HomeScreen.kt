@@ -183,7 +183,7 @@ fun HomeScreen(model: HomeModel, actions: HomeActions) {
                         Hint("Nothing yet. Add an app below, then reconnect your phone to Android Auto.")
                     }
                     else -> {
-                        val outdated = catalog.copies.filter { it.outdated && it.original != null }
+                        val outdated = catalog.copies.filter { it.outdated && it.updatable }
                         if (outdated.size > 1) {
                             item("update-all") { UpdateAllRow(outdated.size, enabled = !busy) { actions.updateAll(outdated) } }
                         }
@@ -472,7 +472,7 @@ private fun CarSign(
     val signs = LocalSigns.current
     var menu by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth().padding(horizontal = Gutter, vertical = 4.dp)) {
-        if (copy.outdated) UpdateTab()
+        if (copy.outdated && copy.updatable) UpdateTab()
         GuidePanel(Modifier.fillMaxWidth()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 AppIcon(copy.icon, 40)
@@ -482,6 +482,7 @@ private fun CarSign(
                     Text(
                         when {
                             copy.original == null -> "Original removed"
+                            copy.signedElsewhere -> "To update, remove it and add it again"
                             copy.outdated -> "${versionText(copy.version!!, copy.originalVersion!!)} → " +
                                 versionText(copy.originalVersion, copy.version)
                             else -> copy.version?.name ?: "In Android Auto"
@@ -492,7 +493,7 @@ private fun CarSign(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                if (copy.outdated) {
+                if (copy.outdated && copy.updatable) {
                     Button(
                         onClick = onUpdate,
                         enabled = !busy,
@@ -505,21 +506,21 @@ private fun CarSign(
                         Icon(Icons.Rounded.MoreVert, contentDescription = "More for ${copy.label}", tint = signs.onGuide)
                     }
                     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                        if (copy.original != null) {
+                        if (copy.updatable) {
                             DropdownMenuItem(
                                 text = { Text("Update copy") },
                                 leadingIcon = { Icon(Icons.Rounded.Refresh, contentDescription = null) },
                                 onClick = { menu = false; onUpdate() },
                             )
                         }
-                        if (copy.original != null && copy.portraitLocked) {
+                        if (copy.updatable && copy.portraitLocked) {
                             DropdownMenuItem(
                                 text = { Text(if (copy.options.fillScreen) "Keep portrait layout" else "Fill the car screen") },
                                 leadingIcon = { Icon(LandscapeGlyph, contentDescription = null) },
                                 onClick = { menu = false; onFillScreen(!copy.options.fillScreen) },
                             )
                         }
-                        if (copy.original != null && copy.hasMediaService) {
+                        if (copy.updatable && copy.hasMediaService) {
                             val keep = copy.options.keepMediaServices
                             DropdownMenuItem(
                                 // Kept media services let Android Auto show its audio player for the copy
