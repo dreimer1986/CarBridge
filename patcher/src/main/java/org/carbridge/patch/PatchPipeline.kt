@@ -17,8 +17,12 @@ class PatchPipeline(private val context: Context, private val log: (String) -> U
         val splits = app.splitSourceDirs.orEmpty().map(::File)
         val base = File(app.sourceDir)
 
-        val totalMb = (splits + base).sumOf { it.length() } / 1024 / 1024
-        log("Reading $totalMb MB in ${splits.size + 1} APK(s)")
+        val total = (splits + base).sumOf { it.length() }
+        log("Reading ${total / MB} MB in ${splits.size + 1} APK(s)")
+        // Unsigned and signed copies sit side by side while signing
+        val needed = total * 2 + 64 * MB
+        val free = work.usableSpace
+        check(free >= needed) { "Not enough free space: needs about ${needed / MB} MB, ${free / MB} MB free" }
 
         val patcher = ManifestPatcher(log)
         val unsignedBase = File(work, "base.unsigned.apk")
@@ -48,6 +52,7 @@ class PatchPipeline(private val context: Context, private val log: (String) -> U
     }
 
     companion object {
+        private const val MB = 1024L * 1024
         private val V1_SIGNATURE_FILES =
             Regex("META-INF/(MANIFEST\\.MF|[^/]+\\.(SF|RSA|DSA|EC))", RegexOption.IGNORE_CASE).toPattern()
 
