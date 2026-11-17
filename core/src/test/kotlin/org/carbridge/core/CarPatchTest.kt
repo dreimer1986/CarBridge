@@ -108,6 +108,36 @@ class CarPatchTest {
         assertFalse(host.application.children("meta-data").count { it.getString(CarPatch.NAME) == CarPatch.CAR_APP_META } > 1)
     }
 
+    @Test
+    fun hidesFromPhoneLauncherButKeepsCarLauncher() {
+        val host = host(manifest())
+        CarPatch.apply(host, CarOptions(hideOnPhone = true))
+        val categories = mainCategories(host)
+        assertFalse(CarPatch.LAUNCHER in categories)
+        assertTrue(categories.containsAll(CarPatch.CAR_CATEGORIES))
+    }
+
+    @Test
+    fun reappliesToHiddenManifest() {
+        val host = host(manifest())
+        CarPatch.apply(host, CarOptions(hideOnPhone = true))
+        CarPatch.apply(host, CarOptions(hideOnPhone = true))
+        val categories = mainCategories(host)
+        assertEquals(categories.size, categories.toSet().size)
+        assertFalse(CarPatch.LAUNCHER in categories)
+    }
+
+    @Test
+    fun keepsPhoneLauncherByDefault() {
+        val host = host(manifest())
+        CarPatch.apply(host)
+        assertTrue(CarPatch.LAUNCHER in mainCategories(host))
+    }
+
+    private fun mainCategories(host: DomHost) = host.application.children("activity")
+        .single { it.getString(CarPatch.NAME) == ".Main" }
+        .children("intent-filter").single().children("category").map { it.getString(CarPatch.NAME) }
+
     private fun manifest() = """
         <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="a.b">
           <uses-permission android:name="android.permission.INTERNET"/>

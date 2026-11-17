@@ -397,6 +397,13 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
         add(original, update = true)
     }
 
+    /** Saves whether the copy shows in the phone's app list and rebuilds it with that. */
+    fun setHideOnPhone(copy: CarCopy, hide: Boolean) {
+        val original = copy.original ?: return
+        prefs.edit().putBoolean("hide_on_phone:${original.info.packageName}", hide).apply()
+        add(original, update = true)
+    }
+
     fun markDeveloperMode() = mark("developer_mode")
     fun markUnknownSources() = mark("unknown_sources")
 

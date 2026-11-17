@@ -6,6 +6,8 @@ data class CarOptions(
     val keepMediaServices: Boolean = false,
     /** Drop portrait-only locks, so the app fills the landscape car display. */
     val fillScreen: Boolean = true,
+    /** Leave the copy out of the phone's app list; Android Auto finds it by its car category. */
+    val hideOnPhone: Boolean = false,
 )
 
 /**
@@ -48,6 +50,7 @@ object CarPatch {
         "androidx.media3.session.MediaLibraryService",
     )
     const val CAR_APP_SERVICE_ACTION = "androidx.car.app.CarAppService"
+    const val LAUNCHER = "android.intent.category.LAUNCHER"
 
     fun apply(host: ManifestHost, options: CarOptions = CarOptions()) {
         val app = host.application
@@ -55,6 +58,7 @@ object CarPatch {
         val stripped = if (options.keepMediaServices) setOf(CAR_APP_SERVICE_ACTION) else MEDIA_SERVICE_ACTIONS + CAR_APP_SERVICE_ACTION
         stripTemplateServices(host, app, stripped)
         if (options.fillScreen) unlockPortrait(host, app)
+        if (options.hideOnPhone) hideFromPhoneLauncher(host, app)
     }
 
     fun launcherActivities(app: ManifestElement): List<ManifestElement> =
@@ -101,6 +105,15 @@ object CarPatch {
         }
     }
 
+    private fun hideFromPhoneLauncher(host: ManifestHost, app: ManifestElement) {
+        for (activity in app.children("activity") + app.children("activity-alias")) {
+            for (filter in activity.children("intent-filter").filter(::isLauncherFilter)) {
+                filter.children("category").filter { it.getString(NAME) == LAUNCHER }.forEach(filter::removeChild)
+            }
+        }
+        host.log("Hidden from the phone's app list")
+    }
+
     private fun unlockPortrait(host: ManifestHost, app: ManifestElement) {
         var unlocked = 0
         for (activity in app.children("activity")) {
@@ -125,6 +138,7 @@ object CarPatch {
     private fun isLauncherFilter(filter: ManifestElement): Boolean {
         val actions = filter.children("action").mapNotNull { it.getString(NAME) }
         val cats = filter.children("category").mapNotNull { it.getString(NAME) }
-        return "android.intent.action.MAIN" in actions && "android.intent.category.LAUNCHER" in cats
+        // A copy hidden on the phone keeps only the car launcher category
+        return "android.intent.action.MAIN" in actions && (LAUNCHER in cats || CAR_CATEGORIES[0] in cats)
     }
 }

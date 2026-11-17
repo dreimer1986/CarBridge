@@ -78,7 +78,10 @@ object AppCatalog {
     fun load(context: Context, options: (String) -> CarOptions): Catalog {
         val pm = context.packageManager
         val launcher = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
-        val launchable = pm.queryIntentActivities(launcher, 0)
+        // Copies hidden on the phone only answer the car launcher category
+        val carLauncher = Intent(Intent.ACTION_MAIN).addCategory(CarPatch.CAR_CATEGORIES[0])
+        val hiddenCopies = pm.queryIntentActivities(carLauncher, 0).filter { it.activityInfo.packageName.endsWith(CAR_SUFFIX) }
+        val launchable = (pm.queryIntentActivities(launcher, 0) + hiddenCopies)
             .map { it.activityInfo.applicationInfo }
             .distinctBy { it.packageName }
             .filter { it.packageName != context.packageName && isUserFacing(it) }

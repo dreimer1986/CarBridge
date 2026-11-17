@@ -15,6 +15,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import androidx.lifecycle.ViewModelProvider
+import org.carbridge.core.CarPatch
 import org.carbridge.patch.KeyBackup
 import org.carbridge.ui.CarBridgeTheme
 import org.carbridge.ui.HomeActions
@@ -51,8 +52,9 @@ class MainActivity : ComponentActivity() {
             openMorphe = { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(MORPHE_SOURCE))) },
             setFillScreen = model::setFillScreen,
             setKeepMedia = model::setKeepMedia,
+            setHideOnPhone = model::setHideOnPhone,
             remove = { copy -> startActivity(Intent(Intent.ACTION_DELETE, Uri.parse("package:${copy.packageName}"))) },
-            open = { copy -> packageManager.getLaunchIntentForPackage(copy.packageName)?.let(::startActivity) },
+            open = ::openCopy,
             saveBackup = saveBackup::launch,
             // Files apps rarely know the .cbkey type, so show every file
             pickBackup = { pickBackup.launch(arrayOf("*/*")) },
@@ -101,6 +103,17 @@ class MainActivity : ComponentActivity() {
         // Settings, uninstall and install prompts all return here
         model.refresh()
         UpdateCheck.dismissIfResolved(this)
+    }
+
+    /** Copies hidden on the phone have no phone launcher entry, so fall back to their car one. */
+    private fun openCopy(copy: CarCopy) {
+        // Explicit component: an implicit start adds CATEGORY_DEFAULT, which launcher filters lack
+        val carEntry = Intent(Intent.ACTION_MAIN).addCategory(CarPatch.CAR_CATEGORIES[0]).setPackage(copy.packageName)
+        val intent = packageManager.getLaunchIntentForPackage(copy.packageName)
+            ?: packageManager.queryIntentActivities(carEntry, 0).firstOrNull()?.activityInfo?.let { info ->
+                Intent(Intent.ACTION_MAIN).setClassName(info.packageName, info.name).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+        intent?.let(::startActivity)
     }
 
     private fun openAndroidAuto() {

@@ -22,7 +22,7 @@ Both put an app's full interface on the Android Auto screen, using the same rule
 | Works with | Almost any installed app, including Play Store split APKs | Apps you patch in Morphe Manager, from an APK you provide |
 | Combine with other patches | No | Yes, e.g. Morphe's YouTube patches |
 | After the original updates | CarBridge notifies you; tap **Update** to rebuild the copy | Repatch the new version in Morphe Manager |
-| Options | Per copy, from its ⋮ menu: fill the car screen, keep the audio player | Patch options: Fill the car screen, Keep media services |
+| Options | Per copy, from its ⋮ menu: fill the car screen, keep the audio player, hide from the phone's app list | Patch options: Fill the car screen, Keep media services |
 | What you need | Only the phone | Morphe Manager |
 
 **Use the CarBridge app** for apps you install from a store and don't otherwise modify, like
@@ -96,7 +96,8 @@ encrypted `.apkm`); such copies update from newer files through **Update from a 
 opened with or shared to CarBridge from a file manager or browser. With [Shizuku](https://shizuku.rikka.app/)
 running, **Settings → Install with Shizuku** installs copies without any prompt, even the first
 time, and gives them the runtime permissions the original app has. Copies drop portrait locks so they fill the
-car screen; the ⋮ menu keeps the portrait layout per app. CarBridge warns before copying apps with
+car screen; the ⋮ menu keeps the portrait layout per app. **Hide from phone's app list** in the
+⋮ menu keeps a copy out of the phone's launcher; it still shows in Android Auto. CarBridge warns before copying apps with
 Google Play's copy protection (`com.pairip.licensecheck`), and points Morphe-patched apps to the
 [CarBridge Patches](https://github.com/jmwerk/carbridge-patches) source instead.
 

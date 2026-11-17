@@ -52,6 +52,7 @@ object CopyBuilder {
         return CarOptions(
             keepMediaServices = prefs.getBoolean("keep_media:$originalPackage", false),
             fillScreen = !prefs.getBoolean("keep_portrait:$originalPackage", false),
+            hideOnPhone = prefs.getBoolean("hide_on_phone:$originalPackage", false),
         )
     }
 

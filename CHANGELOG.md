@@ -12,6 +12,7 @@ What changed in each CarBridge release. Dev pre-releases show the Unreleased sec
 - Optional Shizuku support: installs without prompts, even the first time, and copies get the original app's permissions
 - Messages no longer hide behind the navigation bar
 - Apps already on the car screen, e.g. copies made by AAAnything or Morphe, count as working in Android Auto
+- Hide a car copy from the phone's app list from its ⋮ menu; it still shows in Android Auto
 
 ## [0.6.0] - 2026-11-17
 

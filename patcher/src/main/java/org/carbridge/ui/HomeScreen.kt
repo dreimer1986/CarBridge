@@ -145,6 +145,7 @@ class HomeActions(
     val openMorphe: () -> Unit,
     val setFillScreen: (CarCopy, Boolean) -> Unit,
     val setKeepMedia: (CarCopy, Boolean) -> Unit,
+    val setHideOnPhone: (CarCopy, Boolean) -> Unit,
     val remove: (CarCopy) -> Unit,
     val open: (CarCopy) -> Unit,
     /** Opens Android's file picker to save the key backup under the given name. */
@@ -286,6 +287,7 @@ fun HomeScreen(model: HomeModel, actions: HomeActions) {
                             onFillScreen = { fill -> actions.setFillScreen(copy, fill) },
                             onKeepMedia = { keep -> actions.setKeepMedia(copy, keep) },
                             onUpdateFromFile = { actions.pickApks(copy) },
+                            onHideOnPhone = { hide -> actions.setHideOnPhone(copy, hide) },
                             onAutoUpdate = if (model.autoUpdate) ({ allowed -> model.setAutoUpdateAllowed(copy, allowed) }) else null,
                         )
                     }
@@ -644,6 +646,7 @@ private fun CarSign(
     onFillScreen: (Boolean) -> Unit,
     onKeepMedia: (Boolean) -> Unit,
     onUpdateFromFile: () -> Unit,
+    onHideOnPhone: (Boolean) -> Unit,
     /** Null while automatic updates are off for every copy. */
     onAutoUpdate: ((Boolean) -> Unit)?,
 ) {
@@ -725,6 +728,14 @@ private fun CarSign(
                                 text = { Text(if (keep) "Always show the full app" else "Use Android Auto's audio player") },
                                 leadingIcon = { Icon(Icons.Rounded.PlayArrow, contentDescription = null) },
                                 onClick = { menu = false; onKeepMedia(!keep) },
+                            )
+                        }
+                        if (copy.updatable) {
+                            val hidden = copy.options.hideOnPhone
+                            DropdownMenuItem(
+                                text = { Text(if (hidden) "Show in phone's app list" else "Hide from phone's app list") },
+                                leadingIcon = { Icon(Icons.Rounded.Phone, contentDescription = null) },
+                                onClick = { menu = false; onHideOnPhone(!hidden) },
                             )
                         }
                         if (copy.updatable && onAutoUpdate != null) {
