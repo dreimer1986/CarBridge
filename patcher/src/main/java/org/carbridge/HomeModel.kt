@@ -1,6 +1,7 @@
 package org.carbridge
 
 import android.app.Application
+import android.content.pm.ApplicationInfo
 import android.net.Uri
 import android.util.Log
 import androidx.compose.runtime.getValue
@@ -10,6 +11,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import java.io.File
 import java.time.LocalDate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
@@ -17,7 +19,9 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.carbridge.core.CarOptions
+import org.carbridge.patch.ApkImport
 import org.carbridge.patch.BackupFailure
+import org.carbridge.patch.ImportFailure
 import org.carbridge.patch.KeyBackup
 import org.carbridge.patch.KeystoreSigner
 import org.carbridge.patch.PatchPipeline
@@ -369,15 +373,63 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
     )
 
     fun add(source: SourceApp, update: Boolean) {
+        build(source.label, source.icon, source.info, update)
+    }
+
+    /** The package a file must belong to: set by Update from a file, cleared by Add from a file. */
+    private var expectedFilePackage: String? = null
+
+    fun expectFilesFor(copy: CarCopy?) {
+        expectedFilePackage = copy?.packageName?.let { PatchPipeline.originalPackageName(it) }
+    }
+
+    /** Makes a copy from APK files the user picked, for apps that aren't installed on the phone. */
+    fun addFromFiles(uris: List<Uri>) {
+        if (uris.isEmpty() || job != null || backgroundBuild != null) return
+        val context = getApplication<Application>()
+        val expected = expectedFilePackage
+        viewModelScope.launch {
+            val read = withContext(Dispatchers.IO) {
+                runCatching {
+                    val dir = ApkImport.workDir(context.cacheDir).apply { deleteRecursively(); mkdirs() }
+                    val files = uris.mapIndexed { i, uri ->
+                        File(dir, "picked-$i").also { file ->
+                            context.contentResolver.openInputStream(uri)!!.use { input -> file.outputStream().use(input::copyTo) }
+                        }
+                    }
+                    val import = ApkImport.read(files, dir)
+                    if (expected != null && import.packageName != expected) {
+                        throw ImportFailure("That file is a different app (${import.packageName}). Pick the one this copy was made from.")
+                    }
+                    val pm = context.packageManager
+                    val info = import.applicationInfo(pm)
+                    Triple(info, pm.getApplicationLabel(info).toString(), AppCatalog.icon(pm.getApplicationIcon(info)))
+                }
+            }
+            read.onFailure { e ->
+                Log.w(TAG, "import failed", e)
+                withContext(Dispatchers.IO) { ApkImport.workDir(context.cacheDir).deleteRecursively() }
+                _messages.send(UserMessage("Couldn't use that file.", details((e as? ImportFailure)?.message ?: CopyBuilder.describe(e))))
+            }
+            val (info, label, icon) = read.getOrNull() ?: return@launch
+            val installed = runCatching { context.packageManager.getPackageInfo(info.packageName, 0) }.isSuccess
+            if (!installed) prefs.edit().putBoolean("from_file:${info.packageName}", true).apply()
+            val carPackage = PatchPipeline.carPackageName(info.packageName)
+            val update = runCatching { context.packageManager.getPackageInfo(carPackage, 0) }.isSuccess
+            build(label, icon, info, update) { ApkImport.workDir(context.cacheDir).deleteRecursively() }
+        }
+    }
+
+    private fun build(label: String, icon: ImageBitmap, info: ApplicationInfo, update: Boolean, cleanUp: () -> Unit = {}) {
         if (job != null || backgroundBuild != null) return
         val context = getApplication<Application>()
-        val carPackage = PatchPipeline.carPackageName(source.info.packageName)
+        val carPackage = PatchPipeline.carPackageName(info.packageName)
         log.clear()
-        job = Job(source.label, source.icon, carPackage, update, JobStep.Read.ordinal)
+        job = Job(label, icon, carPackage, update, JobStep.Read.ordinal)
         viewModelScope.launch {
             val started = try {
                 withContext(Dispatchers.IO) {
-                    CopyBuilder.build(context, source.info, ::onLog) {
+                    CopyBuilder.build(context, info, ::onLog) {
                         viewModelScope.launch { job = job?.copy(step = JobStep.Confirm.ordinal) }
                     }
                 }
@@ -386,8 +438,10 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
                 Log.e(TAG, "patch failed", e)
                 job = null
                 nextQueued(continueRun = false)
-                _messages.send(UserMessage("Couldn't add ${source.label}.", details(CopyBuilder.describe(e))))
+                _messages.send(UserMessage("Couldn't add $label.", details(CopyBuilder.describe(e))))
                 return@launch
+            } finally {
+                withContext(Dispatchers.IO) { cleanUp() }
             }
             if (!started) {
                 job = null

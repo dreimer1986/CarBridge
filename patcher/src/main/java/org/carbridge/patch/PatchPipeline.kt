@@ -70,6 +70,8 @@ class PatchPipeline(private val context: Context, private val log: (String) -> U
 
         fun carPackageName(original: String) = "$original.car"
 
+        fun originalPackageName(car: String) = car.removeSuffix(".car")
+
         private fun workDir(context: Context) = File(context.cacheDir, "patch")
 
         /** Frees the patched APKs, which can run to hundreds of MB, once installing has copied them. */

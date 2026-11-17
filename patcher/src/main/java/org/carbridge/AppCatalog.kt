@@ -53,6 +53,8 @@ data class CarCopy(
     val signedElsewhere: Boolean = false,
     /** Made by another CarBridge build still on the phone, e.g. CarBridge Dev, so no key was lost. */
     val madeByOtherCarBridge: Boolean = false,
+    /** Made from APK files rather than an installed app; updated by picking newer files. */
+    val fromFile: Boolean = false,
     /** The user hasn't opted this copy out of automatic updates. */
     val autoUpdateAllowed: Boolean = true,
 ) {
@@ -120,6 +122,7 @@ object AppCatalog {
                 hasMediaService = original != null && hasMediaService(pm, originalPkg),
                 options = options(originalPkg),
                 autoUpdateAllowed = AutoUpdate.isAllowed(context, originalPkg),
+                fromFile = original == null && context.getSharedPreferences("setup", 0).getBoolean("from_file:$originalPkg", false),
                 signedElsewhere = !signer.canUpdate(pm, info.packageName),
                 madeByOtherCarBridge = installer(pm, info.packageName).let { by ->
                     by != null && by != context.packageName && (by == CARBRIDGE_ID || by.startsWith("$CARBRIDGE_ID.")) && isInstalled(pm, by)
@@ -169,6 +172,8 @@ object AppCatalog {
 
     private fun versionOf(pm: PackageManager, pkg: String): Version? =
         runCatching { pm.getPackageInfo(pkg, 0).let { Version(it.longVersionCode, it.versionName) } }.getOrNull()
+
+    fun icon(drawable: Drawable): ImageBitmap = drawable.toImageBitmap()
 
     private fun Drawable.toImageBitmap(): ImageBitmap {
         val bitmap = Bitmap.createBitmap(ICON_PX, ICON_PX, Bitmap.Config.ARGB_8888)

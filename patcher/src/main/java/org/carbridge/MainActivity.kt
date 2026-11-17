@@ -27,6 +27,9 @@ class MainActivity : ComponentActivity() {
     private val saveBackup = registerForActivityResult(ActivityResultContracts.CreateDocument(KeyBackup.MIME_TYPE)) { uri ->
         uri?.let(model::saveBackup)
     }
+    private val pickApks = registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        model.addFromFiles(uris)
+    }
     private val pickBackup = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let(model::openRestore)
     }
@@ -53,6 +56,8 @@ class MainActivity : ComponentActivity() {
             saveBackup = saveBackup::launch,
             // Files apps rarely know the .cbkey type, so show every file
             pickBackup = { pickBackup.launch(arrayOf("*/*")) },
+            // Bundles (.apks, .xapk) have no registered type, so show every file and check the contents
+            pickApks = { copy -> model.expectFilesFor(copy); pickApks.launch(arrayOf("*/*")) },
         )
         UpdateCheck.schedule(this)
         if (savedInstanceState == null) handleUpdateIntent(intent)

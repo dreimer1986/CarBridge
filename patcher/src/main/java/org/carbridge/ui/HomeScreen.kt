@@ -148,6 +148,8 @@ class HomeActions(
     /** Opens Android's file picker to save the key backup under the given name. */
     val saveBackup: (String) -> Unit,
     val pickBackup: () -> Unit,
+    /** Opens the file picker for APKs; with a copy, the files must be a newer version of its app. */
+    val pickApks: (CarCopy?) -> Unit,
 )
 
 private val SignShape = RoundedCornerShape(20.dp)
@@ -156,7 +158,7 @@ private val Gutter = 16.dp
 
 /** Below this many apps the list is short enough to scroll by hand. */
 private const val INDEX_MIN_APPS = 15
-private val APP_LIST_KEYS = setOf("add-title", "search", "auto-toggle", "add-empty", "footer")
+private val APP_LIST_KEYS = setOf("add-title", "add-file", "search", "auto-toggle", "add-empty", "footer")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -280,6 +282,7 @@ fun HomeScreen(model: HomeModel, actions: HomeActions) {
                             onOpen = { actions.open(copy) },
                             onFillScreen = { fill -> actions.setFillScreen(copy, fill) },
                             onKeepMedia = { keep -> actions.setKeepMedia(copy, keep) },
+                            onUpdateFromFile = { actions.pickApks(copy) },
                             onAutoUpdate = if (model.autoUpdate) ({ allowed -> model.setAutoUpdateAllowed(copy, allowed) }) else null,
                         )
                     }
@@ -287,6 +290,13 @@ fun HomeScreen(model: HomeModel, actions: HomeActions) {
                 }
 
                 item("add-title") { SectionTitle("Add an app") }
+                item("add-file") {
+                    OutlinedButton(
+                        onClick = { actions.pickApks(null) },
+                        enabled = !busy,
+                        modifier = Modifier.padding(start = Gutter, end = Gutter, bottom = 12.dp),
+                    ) { Text("Add from an APK file") }
+                }
                 if (catalog != null) {
                     if (catalog.available.size > 6) {
                         item("search") { SearchField(query) { query = it } }
@@ -626,6 +636,7 @@ private fun CarSign(
     onOpen: () -> Unit,
     onFillScreen: (Boolean) -> Unit,
     onKeepMedia: (Boolean) -> Unit,
+    onUpdateFromFile: () -> Unit,
     /** Null while automatic updates are off for every copy. */
     onAutoUpdate: ((Boolean) -> Unit)?,
 ) {
@@ -646,6 +657,7 @@ private fun CarSign(
                         Text(copy.label, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(
                             when {
+                                copy.fromFile -> listOfNotNull("Made from a file", copy.version?.name).joinToString(" · ")
                                 copy.original == null -> "Original removed"
                                 copy.madeByOtherCarBridge -> "Made by another CarBridge app"
                                 copy.signedElsewhere -> "Restore your key to update it"
@@ -678,6 +690,13 @@ private fun CarSign(
                             leadingIcon = { Icon(Icons.Rounded.Phone, contentDescription = null) },
                             onClick = { menu = false; onOpen() },
                         )
+                        if (copy.fromFile && !copy.signedElsewhere) {
+                            DropdownMenuItem(
+                                text = { Text("Update from a file") },
+                                leadingIcon = { Icon(Icons.Rounded.Refresh, contentDescription = null) },
+                                onClick = { menu = false; onUpdateFromFile() },
+                            )
+                        }
                         if (copy.updatable) {
                             DropdownMenuItem(
                                 text = { Text("Update copy") },
