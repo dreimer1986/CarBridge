@@ -27,6 +27,7 @@ object ShizukuMode {
 
     const val PACKAGE = "moe.shizuku.privileged.api"
     const val PERMISSION_REQUEST = 7
+    const val INSTALL_LOG = "Installing through Shizuku"
     private const val PREF = "use_shizuku"
 
     fun state(context: Context): State = when {
@@ -54,7 +55,7 @@ object ShizukuMode {
             log("Shizuku: ${e.message} Installing the usual way.")
             return false
         }
-        log("Installing through Shizuku")
+        log(INSTALL_LOG)
         // -i keeps CarBridge as the installer, so later updates without Shizuku stay prompt-free
         val created = shell.exec("pm", "install-create", "-r", "-i", context.packageName, "--user", "current")
         val session = Regex("""\[(\d+)]""").find(created.output)?.groupValues?.get(1)

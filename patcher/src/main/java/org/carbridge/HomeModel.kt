@@ -30,7 +30,15 @@ import org.carbridge.patch.PatchPipeline
 private const val TAG = "CarBridge"
 
 /** A car copy being made; [step] indexes [JobStep]. */
-data class Job(val label: String, val icon: ImageBitmap, val packageName: String, val update: Boolean, val step: Int) {
+data class Job(
+    val label: String,
+    val icon: ImageBitmap,
+    val packageName: String,
+    val update: Boolean,
+    val step: Int,
+    /** Installing through Shizuku, so Android won't show a prompt. */
+    val silent: Boolean = false,
+) {
     /** [waiting] is how many more copies an Update all run will build after this one. */
     fun headline(waiting: Int) = when {
         waiting > 0 -> "Updating $label, $waiting more after"
@@ -39,7 +47,12 @@ data class Job(val label: String, val icon: ImageBitmap, val packageName: String
     }
 
     // Updates of copies CarBridge installed often skip the prompt
-    val stepText get() = if (update && step == JobStep.Confirm.ordinal) "Installing the update" else JobStep.entries[step].text
+    val stepText get() = when {
+        step != JobStep.Confirm.ordinal -> JobStep.entries[step].text
+        update -> "Installing the update"
+        silent -> "Installing the copy"
+        else -> JobStep.Confirm.text
+    }
 }
 
 enum class JobStep(val text: String) {
@@ -481,6 +494,10 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
     private fun onLog(line: String) {
         Log.i(TAG, line)
         synchronized(log) { log.add(line) }
+        if (line == ShizukuMode.INSTALL_LOG) {
+            viewModelScope.launch { job = job?.copy(silent = true) }
+            return
+        }
         val step = when {
             line.startsWith("Signing") -> JobStep.Sign
             line.startsWith("Car-enabled") || line.startsWith("Renamed") -> JobStep.Patch
