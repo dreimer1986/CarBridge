@@ -92,7 +92,8 @@ phone charges and installs them without a prompt where Android allows; a copy's 
 out. Each original version is tried once, and a copy still waiting after two days, or one that
 failed, gets the notification instead. **Add from an APK file** makes a copy of an app
 that isn't installed, from an APK, a base plus split APKs, or an `.apks`/`.xapk` bundle (not
-encrypted `.apkm`); such copies update from newer files through **Update from a file**. Copies drop portrait locks so they fill the
+encrypted `.apkm`); such copies update from newer files through **Update from a file**. APKs can also be
+opened with or shared to CarBridge from a file manager or browser. Copies drop portrait locks so they fill the
 car screen; the ⋮ menu keeps the portrait layout per app. CarBridge warns before copying apps with
 Google Play's copy protection (`com.pairip.licensecheck`), and points Morphe-patched apps to the
 [CarBridge Patches](https://github.com/jmwerk/carbridge-patches) source instead.

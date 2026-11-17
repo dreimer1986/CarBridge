@@ -60,7 +60,7 @@ class MainActivity : ComponentActivity() {
             pickApks = { copy -> model.expectFilesFor(copy); pickApks.launch(arrayOf("*/*")) },
         )
         UpdateCheck.schedule(this)
-        if (savedInstanceState == null) handleUpdateIntent(intent)
+        if (savedInstanceState == null) handleIntent(intent)
         lifecycleScope.launch {
             model.notificationPrompt.collect { askNotifications.launch(Manifest.permission.POST_NOTIFICATIONS) }
         }
@@ -73,13 +73,27 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        handleUpdateIntent(intent)
+        handleIntent(intent)
     }
 
-    private fun handleUpdateIntent(intent: Intent) {
-        if (intent.action != UpdateCheck.ACTION_UPDATE) return
-        model.updateFromNotification(intent.getStringExtra(UpdateCheck.EXTRA_PACKAGE))
-        UpdateCheck.dismiss(this)
+    private fun handleIntent(intent: Intent) {
+        when (intent.action) {
+            UpdateCheck.ACTION_UPDATE -> {
+                model.updateFromNotification(intent.getStringExtra(UpdateCheck.EXTRA_PACKAGE))
+                UpdateCheck.dismiss(this)
+            }
+            // An APK opened or shared from another app; a newer version updates its existing copy
+            Intent.ACTION_VIEW, Intent.ACTION_SEND, Intent.ACTION_SEND_MULTIPLE -> {
+                model.expectFilesFor(null)
+                model.addFromFiles(sharedFiles(intent))
+            }
+        }
+    }
+
+    private fun sharedFiles(intent: Intent): List<Uri> = when (intent.action) {
+        Intent.ACTION_VIEW -> listOfNotNull(intent.data)
+        Intent.ACTION_SEND -> listOfNotNull(intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java))
+        else -> intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM, Uri::class.java).orEmpty()
     }
 
     override fun onResume() {

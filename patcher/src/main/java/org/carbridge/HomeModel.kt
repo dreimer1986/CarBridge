@@ -385,7 +385,11 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
 
     /** Makes a copy from APK files the user picked, for apps that aren't installed on the phone. */
     fun addFromFiles(uris: List<Uri>) {
-        if (uris.isEmpty() || job != null || backgroundBuild != null) return
+        if (uris.isEmpty()) return
+        if (job != null || backgroundBuild != null) {
+            viewModelScope.launch { _messages.send(UserMessage("CarBridge is making another copy. Open the file again when it's done.")) }
+            return
+        }
         val context = getApplication<Application>()
         val expected = expectedFilePackage
         viewModelScope.launch {
