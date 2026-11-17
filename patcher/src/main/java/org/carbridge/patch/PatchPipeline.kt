@@ -8,17 +8,26 @@ import com.reandroid.apk.ApkModule
 import com.reandroid.archive.writer.ZipAligner
 import java.io.File
 
+/** A failure the user can act on; its message is shown as is. */
+class PatchFailure(message: String) : Exception(message)
+
 /** Original APK(s) in, signed car-enabled APK(s) out, base first. Runs off the main thread. */
 class PatchPipeline(private val context: Context, private val log: (String) -> Unit) {
 
     fun patch(app: ApplicationInfo, options: CarOptions): List<File> {
-        val work = File(context.cacheDir, "patch").apply { deleteRecursively(); mkdirs() }
+        val work = workDir(context).apply { deleteRecursively(); mkdirs() }
         val newPackage = carPackageName(app.packageName)
         val splits = app.splitSourceDirs.orEmpty().map(::File)
         val base = File(app.sourceDir)
 
-        val totalMb = (splits + base).sumOf { it.length() } / 1024 / 1024
-        log("Reading $totalMb MB in ${splits.size + 1} APK(s)")
+        val total = (splits + base).sumOf { it.length() }
+        log("Reading ${total / MB} MB in ${splits.size + 1} APK(s)")
+        // Unsigned and signed copies sit side by side while signing
+        val needed = total * 2 + 64 * MB
+        val free = work.usableSpace
+        if (free < needed) {
+            throw PatchFailure("Not enough free space: needs about ${needed / MB} MB, ${free / MB} MB free.")
+        }
 
         val patcher = ManifestPatcher(log)
         val unsignedBase = File(work, "base.unsigned.apk")
@@ -32,36 +41,53 @@ class PatchPipeline(private val context: Context, private val log: (String) -> U
 
         log("Signing")
         val signer = KeystoreSigner()
-        return (listOf(unsignedBase) + unsignedSplits).map { unsigned ->
-            File(work, unsigned.name.replace(".unsigned", "")).also { signed ->
-                signer.sign(unsigned, signed, minSdk)
+        val signed = (listOf(unsignedBase) + unsignedSplits).map { unsigned ->
+            File(work, unsigned.name.replace(".unsigned", "")).also { out ->
+                signer.sign(unsigned, out, minSdk)
                 unsigned.delete()
             }
         }
+
+        log("Verifying signatures")
+        val cert = signer.certificate()
+        val problems = signed.flatMap { apk -> ApkSigning.verify(apk, minSdk, cert).map { "${apk.name}: $it" } }
+        if (problems.isNotEmpty()) {
+            throw PatchFailure("The signed copy didn't pass Android's signature check.\n" + problems.joinToString("\n"))
+        }
+        log("Signed with ${ApkSigning.sha256(cert).take(17)}…")
+        return signed
     }
 
-    /** Applies [edit], writes an unsigned APK and returns its minSdk. */
-    private fun rewrite(input: File, output: File, edit: (ApkModule) -> Unit): Int =
-        ApkModule.loadApkFile(input).use { apk ->
-            apk.setApkSignatureBlock(null)
-            apk.zipEntryMap.removeIf(V1_SIGNATURE_FILES)
-            edit(apk)
-            val writer = apk.createApkFileWriter(output)
-            writer.zipAligner = ZipAligner().apply {
-                setDefaultAlignment(4)
-                // Uncompressed native libs must be page-aligned; 16 KB covers 4 KB devices too
-                setFileAlignment(ZipAligner.PREDICATE_NATIVE_LIBS, 16 * 1024)
-            }
-            writer.write()
-            apk.androidManifest.minSdkVersion ?: 1
-        }
-
     companion object {
+        private const val MB = 1024L * 1024
         private val V1_SIGNATURE_FILES =
             Regex("META-INF/(MANIFEST\\.MF|[^/]+\\.(SF|RSA|DSA|EC))", RegexOption.IGNORE_CASE).toPattern()
 
         const val CAR_LABEL_SUFFIX = " (Car)"
 
         fun carPackageName(original: String) = "$original.car"
+
+        private fun workDir(context: Context) = File(context.cacheDir, "patch")
+
+        /** Frees the patched APKs, which can run to hundreds of MB, once installing has copied them. */
+        fun clearWork(context: Context) {
+            workDir(context).deleteRecursively()
+        }
+
+        /** Applies [edit], writes an unsigned APK and returns its minSdk. */
+        internal fun rewrite(input: File, output: File, edit: (ApkModule) -> Unit): Int =
+            ApkModule.loadApkFile(input).use { apk ->
+                apk.setApkSignatureBlock(null)
+                apk.zipEntryMap.removeIf(V1_SIGNATURE_FILES)
+                edit(apk)
+                val writer = apk.createApkFileWriter(output)
+                writer.zipAligner = ZipAligner().apply {
+                    setDefaultAlignment(4)
+                    // Uncompressed native libs must be page-aligned; 16 KB covers 4 KB devices too
+                    setFileAlignment(ZipAligner.PREDICATE_NATIVE_LIBS, 16 * 1024)
+                }
+                writer.write()
+                apk.androidManifest.minSdkVersion ?: 1
+            }
     }
 }

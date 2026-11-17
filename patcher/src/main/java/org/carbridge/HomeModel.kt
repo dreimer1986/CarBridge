@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.carbridge.core.CarOptions
+import org.carbridge.patch.PatchFailure
 import org.carbridge.patch.PatchPipeline
 
 private const val TAG = "CarBridge"
@@ -88,7 +89,7 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Rebuilds every outdated copy in turn; each still needs its own install confirmation. */
+    /** Rebuilds every outdated copy in turn; Android may ask to confirm each install. */
     fun updateAll(copies: List<CarCopy>) {
         if (job != null) return
         updateQueue.clear()
@@ -229,7 +230,15 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
                 Log.e(TAG, "patch failed", e)
                 job = null
                 nextQueued(continueRun = false)
-                _messages.send(UserMessage("Couldn't add ${source.label}.", details("${e.javaClass.simpleName}: ${e.message}")))
+                val reason = when (e) {
+                    is PatchFailure -> e.message
+                    is OutOfMemoryError -> "The app is too large to patch in the memory available. Close other apps and try again."
+                    else -> "${e.javaClass.simpleName}: ${e.message}"
+                }
+                _messages.send(UserMessage("Couldn't add ${source.label}.", details(reason)))
+            } finally {
+                // The install session holds its own copy once committed
+                withContext(Dispatchers.IO) { PatchPipeline.clearWork(context) }
             }
         }
     }

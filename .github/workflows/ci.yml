@@ -1,4 +1,5 @@
-# Builds the app and runs the tests, including the shared Android Auto rules in core/.
+# Builds the app and runs the tests, including the shared Android Auto rules in core/, then
+# patches and signs a real APK and checks it with apksigner and aapt2.
 name: CI
 
 on:
@@ -21,3 +22,20 @@ jobs:
 
       - name: Test and build
         run: ./gradlew --no-daemon :core:test :patcher:testDebugUnitTest :patcher:assembleDebug
+
+      # CarBridge's own debug APK is a real app with providers and resources to patch
+      - name: Patch, sign and verify a real APK
+        run: >
+          ./gradlew --no-daemon :patcher:testDebugUnitTest --tests '*patchesSignsAndVerifiesFixture*'
+          -PpatchFixture="$PWD/patcher/build/outputs/apk/debug/patcher-debug.apk" -PpatchHeap=512m
+
+      - name: Check the copy with the SDK's tools
+        run: |
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          OUT=patcher/build/patch-test/base.apk
+          "$BT/apksigner" verify --print-certs "$OUT"
+          "$BT/aapt2" dump xmltree --file AndroidManifest.xml "$OUT" > manifest.txt
+          for want in org.carbridge.debug.car android.intent.category.CAR_LAUNCHER \
+                      com.google.android.gms.car.application; do
+            grep -q "$want" manifest.txt || { echo "Missing from manifest: $want"; exit 1; }
+          done

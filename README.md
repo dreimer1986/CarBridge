@@ -87,7 +87,7 @@ Google Play's copy protection (`com.pairip.licensecheck`), and points Morphe-pat
 | Edit the binary manifest and resources | `patch/ManifestPatcher.kt` | ARSCLib 1.4.0 (Apache-2.0) |
 | Label and icon | `patch/IconBadger.kt` | Draws the original icon plus the badge on the phone |
 | Sign | `patch/KeystoreSigner.kt` | apksig 9.5.1 (Apache-2.0); RSA-3072 key in the Android Keystore, 16 KB native-lib alignment |
-| Install | `Installer.kt` | `PackageInstaller` session; the user confirms each install |
+| Install | `Installer.kt` | `PackageInstaller` session; the user confirms new copies, and updates when Android requires it |
 
 A JVM check of the patch against a real APK, or a directory of `base.apk` + `split_*.apk`,
 verified afterwards with `aapt2`. `-PpatchHeap=256m` mirrors a phone's heap cap:

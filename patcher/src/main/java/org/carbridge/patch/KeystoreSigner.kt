@@ -1,8 +1,8 @@
 package org.carbridge.patch
 
+import android.content.pm.PackageManager
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
-import com.android.apksig.ApkSigner
 import java.io.File
 import java.math.BigInteger
 import java.security.KeyPairGenerator
@@ -20,18 +20,27 @@ class KeystoreSigner {
 
     fun sign(input: File, output: File, minSdk: Int) {
         val (key, cert) = loadOrCreateKey()
-        val signer = ApkSigner.SignerConfig.Builder("CarBridge", key, listOf(cert)).build()
-        ApkSigner.Builder(listOf(signer))
-            .setInputApk(input)
-            .setOutputApk(output)
-            .setMinSdkVersion(minSdk)
-            .setV1SigningEnabled(minSdk < 24)
-            .setV2SigningEnabled(true)
-            .setV3SigningEnabled(true)
-            .setLibraryPageAlignmentBytes(PAGE_16K)
-            .setCreatedBy("CarBridge")
-            .build()
-            .sign()
+        ApkSigning.sign(input, output, minSdk, key, cert)
+    }
+
+    /** The certificate copies are signed with; created with the key on first use. */
+    fun certificate(): X509Certificate = loadOrCreateKey().second
+
+    /** The certificate if the key exists; it's gone after CarBridge is reinstalled or its data cleared. */
+    private val existingCertificate: X509Certificate? by lazy {
+        KeyStore.getInstance(KEYSTORE).apply { load(null) }.getCertificate(ALIAS) as X509Certificate?
+    }
+
+    /**
+     * False when installed [pkg] was signed with a key this phone no longer has, so Android would
+     * refuse a rebuilt copy as an update. True when the signers can't be read, to never block.
+     */
+    fun signedHere(pm: PackageManager, pkg: String): Boolean {
+        val signers = runCatching {
+            pm.getPackageInfo(pkg, PackageManager.GET_SIGNING_CERTIFICATES).signingInfo?.apkContentsSigners
+        }.getOrNull() ?: return true
+        val cert = existingCertificate ?: return false
+        return signers.any { it.toByteArray().contentEquals(cert.encoded) }
     }
 
     private fun loadOrCreateKey(): Pair<PrivateKey, X509Certificate> {
@@ -63,6 +72,5 @@ class KeystoreSigner {
     private companion object {
         const val KEYSTORE = "AndroidKeyStore"
         const val ALIAS = "carbridge-signer"
-        const val PAGE_16K = 16 * 1024
     }
 }
