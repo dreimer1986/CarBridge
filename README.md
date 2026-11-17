@@ -37,10 +37,10 @@ re-sign the app.
 
 ## Install
 
-Get it with [Obtainium](https://github.com/ImranR98/Obtainium), which installs and updates
-CarBridge from this repo's GitHub releases:
-**[Add to Obtainium](https://apps.obtainium.imranr.dev/redirect?r=obtainium://add/https://github.com/jmwerk/CarBridge)**.
-Or download the APK from [Releases](https://github.com/jmwerk/CarBridge/releases).
+[<img src="https://raw.githubusercontent.com/ImranR98/Obtainium/main/assets/graphics/badge_obtainium.png" alt="Get it on Obtainium" height="80">](https://apps.obtainium.imranr.dev/redirect?r=obtainium://add/https://github.com/jmwerk/CarBridge)
+
+[Obtainium](https://github.com/ImranR98/Obtainium) installs and updates CarBridge from this repo's
+GitHub releases. Or download the APK from [Releases](https://github.com/jmwerk/CarBridge/releases).
 
 Release APKs are signed with certificate SHA-256
 `a4:68:93:60:a9:1a:49:b1:6f:a7:b1:50:dc:fc:6e:2b:89:21:1a:cd:b9:63:b5:5f:1b:15:70:4a:da:43:cc:7f`.
