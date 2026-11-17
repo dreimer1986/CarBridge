@@ -1,6 +1,7 @@
 package org.carbridge.patch
 
 import com.reandroid.apk.ApkModule
+import com.reandroid.arsc.chunk.xml.AndroidManifestBlock
 import java.io.File
 import java.security.KeyStore
 import java.security.PrivateKey
@@ -17,6 +18,25 @@ class ManifestPatcherTest {
         assertEquals("a.b.car.provider", ManifestPatcher.renameValue("a.b.provider", "a.b", "a.b.car"))
         assertEquals("a.b.car.x;a.b.car.y", ManifestPatcher.renameValue("a.b.x;y", "a.b", "a.b.car"))
         assertEquals("a.b.car", ManifestPatcher.renameValue("a.b", "a.b", "a.b.car"))
+    }
+
+    @Test
+    fun renameKeepsQueriedProviderAuthorities() {
+        val manifest = AndroidManifestBlock().apply { packageName = "a.b" }
+        val root = manifest.manifestElement
+        // A <queries> provider names another app's authority, e.g. Android Auto's car connection
+        root.newElement("queries").newElement("provider")
+            .getOrCreateAndroidAttribute("authorities", ID_AUTHORITIES).setValueAsString("androidx.car.app.connection")
+        manifest.getOrCreateApplicationElement().newElement("provider")
+            .getOrCreateAndroidAttribute("authorities", ID_AUTHORITIES).setValueAsString("a.b.provider")
+        val apk = ApkModule().apply { setManifest(manifest) }
+
+        ManifestPatcher {}.patchSplit(apk, "a.b.car")
+
+        fun authority(parent: String) = apk.androidManifest.manifestElement.listElements(parent).single()
+            .listElements("provider").single().searchAttributeByResourceId(ID_AUTHORITIES).valueAsString
+        assertEquals("androidx.car.app.connection", authority("queries"))
+        assertEquals("a.b.car.provider", authority("application"))
     }
 
     /**
@@ -70,5 +90,9 @@ class ManifestPatcherTest {
         val ks = KeyStore.getInstance("PKCS12").apply { store.inputStream().use { load(it, password.toCharArray()) } }
         store.delete()
         return ks.getKey("signer", password.toCharArray()) as PrivateKey to ks.getCertificate("signer") as X509Certificate
+    }
+
+    private companion object {
+        const val ID_AUTHORITIES = 0x01010018 // android.R.attr.authorities
     }
 }
