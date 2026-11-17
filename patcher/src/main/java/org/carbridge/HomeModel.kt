@@ -4,6 +4,7 @@ import android.app.Application
 import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.lifecycle.AndroidViewModel
@@ -20,7 +21,17 @@ import org.carbridge.patch.PatchPipeline
 private const val TAG = "CarBridge"
 
 /** A car copy being made; [step] indexes [JobStep]. */
-data class Job(val label: String, val icon: ImageBitmap, val packageName: String, val update: Boolean, val step: Int)
+data class Job(val label: String, val icon: ImageBitmap, val packageName: String, val update: Boolean, val step: Int) {
+    /** [waiting] is how many more copies an Update all run will build after this one. */
+    fun headline(waiting: Int) = when {
+        waiting > 0 -> "Updating $label, $waiting more after"
+        update -> "Updating $label"
+        else -> "Adding $label to your car"
+    }
+
+    // Updates of copies CarBridge installed often skip the prompt
+    val stepText get() = if (update && step == JobStep.Confirm.ordinal) "Installing the update" else JobStep.entries[step].text
+}
 
 enum class JobStep(val text: String) {
     Read("Reading the app"),
@@ -64,6 +75,15 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
     val notificationPrompt = _notificationPrompt.receiveAsFlow()
 
     init {
+        viewModelScope.launch {
+            // queued stays above 0 between copies of an Update all run, so the service keeps running
+            snapshotFlow { job to queued }.collect { (current, waiting) ->
+                when {
+                    current != null -> PatchService.show(app, current.headline(maxOf(waiting - 1, 0)), current.stepText)
+                    waiting == 0 -> PatchService.stop(app)
+                }
+            }
+        }
         viewModelScope.launch {
             Installer.events.collect { result ->
                 val current = job
@@ -252,6 +272,11 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
             else -> null
         } ?: return
         viewModelScope.launch { job = job?.copy(step = maxOf(job?.step ?: 0, step.ordinal)) }
+    }
+
+    override fun onCleared() {
+        // The patch runs in viewModelScope, which is cancelled with the model
+        PatchService.stop(getApplication())
     }
 
     private fun details(error: String?) = synchronized(log) { (log + listOfNotNull(error)).joinToString("\n") }

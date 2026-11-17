@@ -13,6 +13,9 @@
     <!-- Out-of-date car copy notices; the periodic check survives reboots -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Keeps a long patch alive while the user leaves the app; dataSync covers local file processing -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
     <!-- largeHeap: ARSCLib holds a whole APK's tables in memory; YouTube needs over 100 MB -->
     <application
@@ -34,6 +37,11 @@
         <receiver
             android:name=".InstallStatusReceiver"
             android:exported="false" />
+
+        <service
+            android:name=".PatchService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
 
         <service
             android:name=".UpdateCheckService"

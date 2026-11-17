@@ -768,18 +768,13 @@ private fun JobBar(job: Job, waiting: Int) {
                 Spacer(Modifier.width(14.dp))
                 Column(Modifier.weight(1f)) {
                     Text(
-                        when {
-                            waiting > 0 -> "Updating ${job.label}, $waiting more after"
-                            job.update -> "Updating ${job.label}"
-                            else -> "Adding ${job.label} to your car"
-                        },
+                        job.headline(waiting),
                         style = MaterialTheme.typography.titleMedium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
-                        // Updates of copies CarBridge installed often skip the prompt
-                        if (job.update && job.step == JobStep.Confirm.ordinal) "Installing the update" else JobStep.entries[job.step].text,
+                        job.stepText,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
