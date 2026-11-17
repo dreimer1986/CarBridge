@@ -1,0 +1,8 @@
+- Tap a car copy to open it on your phone, e.g. to sign in
+- A–Z strip to jump through a long app list
+- Updates to car copies often install without a prompt
+- Patching continues if you leave CarBridge
+- Clearer messages when a copy can't be made or installed
+- Preinstalled apps updated from the Play Store (e.g. YouTube, Chrome) can be added
+- Copies made before CarBridge was reinstalled are flagged for re-adding
+- Free space is checked first, and patched files are deleted after installing
