@@ -86,7 +86,11 @@ Open CarBridge, tap **Add** next to an app, and confirm Android's install prompt
 as `<package>.car` next to the original, named "<App> (Car)" with a bridge badge on its icon. Then
 reconnect Android Auto. Tap a copy in CarBridge to open it on the phone, e.g. to sign in, since
 copies start with no data. When the original updates, CarBridge sends a notification, flags the copy,
-and offers **Update all** when several are out of date. Copies drop portrait locks so they fill the
+and offers **Update all** when several are out of date. With **Update copies automatically** on
+(About, or the notification's button), a job rebuilds outdated copies one at a time while the
+phone charges and installs them without a prompt where Android allows; a copy's ⋮ menu opts it
+out. Each original version is tried once, and a copy still waiting after two days, or one that
+failed, gets the notification instead. Copies drop portrait locks so they fill the
 car screen; the ⋮ menu keeps the portrait layout per app. CarBridge warns before copying apps with
 Google Play's copy protection (`com.pairip.licensecheck`), and points Morphe-patched apps to the
 [CarBridge Patches](https://github.com/jmwerk/carbridge-patches) source instead.
@@ -99,6 +103,10 @@ Google Play's copy protection (`com.pairip.licensecheck`), and points Morphe-pat
 | Sign | `patch/KeystoreSigner.kt` | apksig 9.5.1 (Apache-2.0); RSA-3072 key in the Android Keystore, 16 KB native-lib alignment |
 | Key backup | `patch/KeyBackup.kt` | Backup key plus v3 rotation lineage, sealed with a recovery code; see [Key backup](#key-backup) |
 | Install | `Installer.kt` | `PackageInstaller` session; the user confirms new copies, and updates when Android requires it |
+
+Test the background updater without waiting for an app update (debug builds): `adb shell am
+broadcast -n org.carbridge.debug/org.carbridge.AutoUpdateDebugReceiver`, then `adb shell cmd
+jobscheduler run -f org.carbridge.debug 2`.
 
 A JVM check of the patch against a real APK, or a directory of `base.apk` + `split_*.apk`,
 verified afterwards with `aapt2`. `-PpatchHeap=256m` mirrors a phone's heap cap:
