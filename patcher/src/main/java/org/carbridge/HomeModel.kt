@@ -230,6 +230,9 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
                 job = null
                 nextQueued(continueRun = false)
                 _messages.send(UserMessage("Couldn't add ${source.label}.", details("${e.javaClass.simpleName}: ${e.message}")))
+            } finally {
+                // The install session holds its own copy once committed
+                withContext(Dispatchers.IO) { PatchPipeline.clearWork(context) }
             }
         }
     }

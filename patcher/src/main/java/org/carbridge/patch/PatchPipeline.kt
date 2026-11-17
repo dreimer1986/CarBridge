@@ -12,7 +12,7 @@ import java.io.File
 class PatchPipeline(private val context: Context, private val log: (String) -> Unit) {
 
     fun patch(app: ApplicationInfo, options: CarOptions): List<File> {
-        val work = File(context.cacheDir, "patch").apply { deleteRecursively(); mkdirs() }
+        val work = workDir(context).apply { deleteRecursively(); mkdirs() }
         val newPackage = carPackageName(app.packageName)
         val splits = app.splitSourceDirs.orEmpty().map(::File)
         val base = File(app.sourceDir)
@@ -59,6 +59,13 @@ class PatchPipeline(private val context: Context, private val log: (String) -> U
         const val CAR_LABEL_SUFFIX = " (Car)"
 
         fun carPackageName(original: String) = "$original.car"
+
+        private fun workDir(context: Context) = File(context.cacheDir, "patch")
+
+        /** Frees the patched APKs, which can run to hundreds of MB, once installing has copied them. */
+        fun clearWork(context: Context) {
+            workDir(context).deleteRecursively()
+        }
 
         /** Applies [edit], writes an unsigned APK and returns its minSdk. */
         internal fun rewrite(input: File, output: File, edit: (ApkModule) -> Unit): Int =
