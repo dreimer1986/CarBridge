@@ -84,7 +84,8 @@ need the keep rules in `patcher/proguard-rules.pro`, or v1 signing fails.
 
 Open CarBridge, tap **Add** next to an app, and confirm Android's install prompt. The copy installs
 as `<package>.car` next to the original, named "<App> (Car)" with a bridge badge on its icon. Then
-reconnect Android Auto. When the original updates, CarBridge sends a notification, flags the copy,
+reconnect Android Auto. Tap a copy in CarBridge to open it on the phone, e.g. to sign in, since
+copies start with no data. When the original updates, CarBridge sends a notification, flags the copy,
 and offers **Update all** when several are out of date. Copies drop portrait locks so they fill the
 car screen; the ⋮ menu keeps the portrait layout per app. CarBridge warns before copying apps with
 Google Play's copy protection (`com.pairip.licensecheck`), and points Morphe-patched apps to the

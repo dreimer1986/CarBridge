@@ -41,6 +41,7 @@ class MainActivity : ComponentActivity() {
             setFillScreen = model::setFillScreen,
             setKeepMedia = model::setKeepMedia,
             remove = { copy -> startActivity(Intent(Intent.ACTION_DELETE, Uri.parse("package:${copy.packageName}"))) },
+            open = { copy -> packageManager.getLaunchIntentForPackage(copy.packageName)?.let(::startActivity) },
         )
         UpdateCheck.schedule(this)
         if (savedInstanceState == null) handleUpdateIntent(intent)

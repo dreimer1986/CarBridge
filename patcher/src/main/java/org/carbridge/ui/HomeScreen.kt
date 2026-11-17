@@ -12,6 +12,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -46,6 +47,7 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.Phone
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
@@ -117,6 +119,7 @@ class HomeActions(
     val setFillScreen: (CarCopy, Boolean) -> Unit,
     val setKeepMedia: (CarCopy, Boolean) -> Unit,
     val remove: (CarCopy) -> Unit,
+    val open: (CarCopy) -> Unit,
 )
 
 private val SignShape = RoundedCornerShape(20.dp)
@@ -193,6 +196,7 @@ fun HomeScreen(model: HomeModel, actions: HomeActions) {
                             busy,
                             onUpdate = { actions.update(copy) },
                             onRemove = { actions.remove(copy) },
+                            onOpen = { actions.open(copy) },
                             onFillScreen = { fill -> actions.setFillScreen(copy, fill) },
                             onKeepMedia = { keep -> actions.setKeepMedia(copy, keep) },
                         )
@@ -466,6 +470,7 @@ private fun CarSign(
     busy: Boolean,
     onUpdate: () -> Unit,
     onRemove: () -> Unit,
+    onOpen: () -> Unit,
     onFillScreen: (Boolean) -> Unit,
     onKeepMedia: (Boolean) -> Unit,
 ) {
@@ -475,23 +480,29 @@ private fun CarSign(
         if (copy.outdated && copy.updatable) UpdateTab()
         GuidePanel(Modifier.fillMaxWidth()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                AppIcon(copy.icon, 40)
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(copy.label, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(
-                        when {
-                            copy.original == null -> "Original removed"
-                            copy.signedElsewhere -> "To update, remove it and add it again"
-                            copy.outdated -> "${versionText(copy.version!!, copy.originalVersion!!)} → " +
-                                versionText(copy.originalVersion, copy.version)
-                            else -> copy.version?.name ?: "In Android Auto"
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = signs.onGuideMuted,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                // Opening on the phone is how users sign in to a copy, which starts with no data
+                Row(
+                    Modifier.weight(1f).clickable(enabled = !busy, onClickLabel = "Open ${copy.label}", onClick = onOpen),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    AppIcon(copy.icon, 40)
+                    Spacer(Modifier.width(12.dp))
+                    Column {
+                        Text(copy.label, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(
+                            when {
+                                copy.original == null -> "Original removed"
+                                copy.signedElsewhere -> "To update, remove it and add it again"
+                                copy.outdated -> "${versionText(copy.version!!, copy.originalVersion!!)} → " +
+                                    versionText(copy.originalVersion, copy.version)
+                                else -> copy.version?.name ?: "In Android Auto"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = signs.onGuideMuted,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
                 if (copy.outdated && copy.updatable) {
                     Button(
@@ -506,6 +517,11 @@ private fun CarSign(
                         Icon(Icons.Rounded.MoreVert, contentDescription = "More for ${copy.label}", tint = signs.onGuide)
                     }
                     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                        DropdownMenuItem(
+                            text = { Text("Open on phone") },
+                            leadingIcon = { Icon(Icons.Rounded.Phone, contentDescription = null) },
+                            onClick = { menu = false; onOpen() },
+                        )
                         if (copy.updatable) {
                             DropdownMenuItem(
                                 text = { Text("Update copy") },
