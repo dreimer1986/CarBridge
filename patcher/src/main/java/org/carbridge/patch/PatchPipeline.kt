@@ -8,6 +8,9 @@ import com.reandroid.apk.ApkModule
 import com.reandroid.archive.writer.ZipAligner
 import java.io.File
 
+/** A failure the user can act on; its message is shown as is. */
+class PatchFailure(message: String) : Exception(message)
+
 /** Original APK(s) in, signed car-enabled APK(s) out, base first. Runs off the main thread. */
 class PatchPipeline(private val context: Context, private val log: (String) -> Unit) {
 
@@ -22,7 +25,9 @@ class PatchPipeline(private val context: Context, private val log: (String) -> U
         // Unsigned and signed copies sit side by side while signing
         val needed = total * 2 + 64 * MB
         val free = work.usableSpace
-        check(free >= needed) { "Not enough free space: needs about ${needed / MB} MB, ${free / MB} MB free" }
+        if (free < needed) {
+            throw PatchFailure("Not enough free space: needs about ${needed / MB} MB, ${free / MB} MB free.")
+        }
 
         val patcher = ManifestPatcher(log)
         val unsignedBase = File(work, "base.unsigned.apk")
@@ -46,7 +51,9 @@ class PatchPipeline(private val context: Context, private val log: (String) -> U
         log("Verifying signatures")
         val cert = signer.certificate()
         val problems = signed.flatMap { apk -> ApkSigning.verify(apk, minSdk, cert).map { "${apk.name}: $it" } }
-        check(problems.isEmpty()) { "Signature check failed:\n" + problems.joinToString("\n") }
+        if (problems.isNotEmpty()) {
+            throw PatchFailure("The signed copy didn't pass Android's signature check.\n" + problems.joinToString("\n"))
+        }
         log("Signed with ${ApkSigning.sha256(cert).take(17)}…")
         return signed
     }
