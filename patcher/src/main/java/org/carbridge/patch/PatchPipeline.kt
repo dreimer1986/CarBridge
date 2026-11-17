@@ -43,21 +43,21 @@ class PatchPipeline(private val context: Context, private val log: (String) -> U
         }
 
         log("Signing")
-        val signer = KeystoreSigner()
+        val signing = KeystoreSigner(context).signerFor(context.packageManager, newPackage)
         val signed = (listOf(unsignedBase) + unsignedSplits).map { unsigned ->
             File(work, unsigned.name.replace(".unsigned", "")).also { out ->
-                signer.sign(unsigned, out, minSdk)
+                signing.sign(unsigned, out, minSdk)
                 unsigned.delete()
             }
         }
 
         log("Verifying signatures")
-        val cert = signer.certificate()
-        val problems = signed.flatMap { apk -> ApkSigning.verify(apk, minSdk, cert).map { "${apk.name}: $it" } }
+        val problems = signed.flatMap { apk -> signing.verify(apk, minSdk).map { "${apk.name}: $it" } }
         if (problems.isNotEmpty()) {
             throw PatchFailure("The signed copy didn't pass Android's signature check.\n" + problems.joinToString("\n"))
         }
-        log("Signed with ${ApkSigning.sha256(cert).take(17)}…")
+        val restored = if (signing.lineage != null) " (restored key)" else ""
+        log("Signed with ${signing.fingerprint.take(17)}…$restored")
         return signed
     }
 

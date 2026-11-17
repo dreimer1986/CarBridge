@@ -97,7 +97,7 @@ object AppCatalog {
             info.packageName to info.toSource(pm, info.packageName in autoApps, caution)
         }
 
-        val signer = KeystoreSigner()
+        val signer = KeystoreSigner(context)
         val copies = copyInfos.map { info ->
             val originalPkg = info.packageName.removeSuffix(CAR_SUFFIX)
             val original = sources[originalPkg]
@@ -112,7 +112,7 @@ object AppCatalog {
                 portraitLocked = original != null && locksPortrait(pm, originalPkg),
                 hasMediaService = original != null && hasMediaService(pm, originalPkg),
                 options = options(originalPkg),
-                signedElsewhere = !signer.signedHere(pm, info.packageName),
+                signedElsewhere = !signer.canUpdate(pm, info.packageName),
             )
         }.sortedWith(compareBy({ !it.outdated }, { it.label.lowercase() }))
 

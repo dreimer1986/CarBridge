@@ -48,7 +48,7 @@ object UpdateCheck {
     fun findOutdated(context: Context): List<Outdated> {
         val pm = context.packageManager
         val suffix = PatchPipeline.carPackageName("")
-        val signer = KeystoreSigner()
+        val signer = KeystoreSigner(context)
         return pm.getInstalledPackages(0)
             .filter { it.packageName.endsWith(suffix) }
             .mapNotNull { copy ->
@@ -56,7 +56,7 @@ object UpdateCheck {
                 val original = runCatching { pm.getPackageInfo(originalPkg, 0) }.getOrNull() ?: return@mapNotNull null
                 if (original.longVersionCode <= copy.longVersionCode) return@mapNotNull null
                 // An update couldn't install over it, so don't ask for one
-                if (!signer.signedHere(pm, copy.packageName)) return@mapNotNull null
+                if (!signer.canUpdate(pm, copy.packageName)) return@mapNotNull null
                 val label = original.applicationInfo?.loadLabel(pm)?.toString() ?: originalPkg
                 Outdated(originalPkg, label, original.longVersionCode)
             }
