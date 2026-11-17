@@ -207,7 +207,8 @@ fun HomeScreen(model: HomeModel, actions: HomeActions) {
     val addApp = { app: SourceApp -> if (app.caution != null) cautionFor = app else actions.add(app) }
 
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbar) },
+        // Edge to edge: lift messages above the navigation bar unless the progress bar already does
+        snackbarHost = { SnackbarHost(snackbar, if (busy) Modifier else Modifier.navigationBarsPadding()) },
         bottomBar = {
             AnimatedVisibility(busy, enter = slideInVertically { it }, exit = slideOutVertically { it }) {
                 when {
