@@ -122,9 +122,9 @@ JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradle
 
 ## Split screen (experimental)
 
-A copy's ⋮ menu → **Show in split screen (needs Shizuku)** rebuilds it to show in Android Auto's
-main pane, next to the media and notification cards, instead of full screen. **Show full screen**
-switches back.
+A copy's ⋮ menu → **Car screen layout…** → **Next to the media cards** rebuilds it to show in
+Android Auto's main pane, next to the media and notification cards, instead of full screen.
+**Full screen** switches back.
 
 What you need:
 
@@ -147,8 +147,8 @@ How it works:
 - **Back** at the top right goes back inside the app. On the app's main screen it shows the
   app's name instead and does nothing, unless the app handles Back in its own code.
 - The app runs on its own display, so it can be open on the phone and the car at the same time.
-- **Use the full pane height** in the ⋮ menu uses the space under Android Auto's button strip
-  too. The app gets more room, but the button covers its top-right corner while it's visible.
+- **Let the app go under the Back button**, in the same dialog, uses the space under **Back** too.
+  The app gets more room, but the button covers its top-right corner while it's visible.
 
 Known issues:
 

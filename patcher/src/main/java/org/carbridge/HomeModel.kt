@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.carbridge.core.CarOptions
+import org.carbridge.core.SplitScreenOptions
 import org.carbridge.patch.ApkImport
 import rikka.shizuku.Shizuku
 import org.carbridge.patch.BackupFailure
@@ -383,17 +384,13 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
 
     private fun carOptions(originalPackage: String) = CopyBuilder.options(getApplication(), originalPackage)
 
-    /** Saves the split-screen choice and rebuilds the copy with it. */
-    fun setSplitScreen(copy: CarCopy, on: Boolean) {
+    /** Saves the car screen layout (null = full screen) and rebuilds the copy with it. */
+    fun setCarLayout(copy: CarCopy, splitScreen: SplitScreenOptions?) {
         val original = copy.original ?: return
-        prefs.edit().putBoolean("split_screen:${original.info.packageName}", on).apply()
-        add(original, update = true)
-    }
-
-    /** Saves the split-screen pane height and rebuilds the copy with it. */
-    fun setFullHeight(copy: CarCopy, on: Boolean) {
-        val original = copy.original ?: return
-        prefs.edit().putBoolean("full_height:${original.info.packageName}", on).apply()
+        val pkg = original.info.packageName
+        prefs.edit().putBoolean("split_screen:$pkg", splitScreen != null).apply {
+            if (splitScreen != null) putBoolean("full_height:$pkg", splitScreen.fullHeight)
+        }.apply()
         add(original, update = true)
     }
 

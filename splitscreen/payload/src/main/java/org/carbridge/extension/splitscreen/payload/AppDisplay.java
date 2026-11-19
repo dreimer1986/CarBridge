@@ -43,7 +43,7 @@ final class AppDisplay {
     private static final long RELEASE_DELAY_MS = 5000;
     private static final long BACK_CHECK_MS = 1000;
     private static final long BACK_RETURN_MS = 500;
-    // Written by the patch's "Use the full pane height" option
+    // Written by the "Let the app go under the Back button" option
     // The service the patch declares; it reads the option from its meta-data
     private static final String SERVICE = "org.carbridge.extension.splitscreen.SplitScreenCarAppService";
     private static final String FULL_HEIGHT_META = "org.carbridge.extension.splitscreen.FULL_HEIGHT";

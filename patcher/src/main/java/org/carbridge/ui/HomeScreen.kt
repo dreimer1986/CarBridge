@@ -132,6 +132,7 @@ import org.carbridge.SourceApp
 import org.carbridge.UserMessage
 import org.carbridge.Version
 import org.carbridge.core.CarOptions
+import org.carbridge.core.SplitScreenOptions
 import org.carbridge.patch.KeyBackup
 
 class HomeActions(
@@ -145,8 +146,8 @@ class HomeActions(
     val openMorphe: () -> Unit,
     val setFillScreen: (CarCopy, Boolean) -> Unit,
     val setKeepMedia: (CarCopy, Boolean) -> Unit,
-    val setSplitScreen: (CarCopy, Boolean) -> Unit,
-    val setFullHeight: (CarCopy, Boolean) -> Unit,
+    /** Null = full screen. */
+    val setCarLayout: (CarCopy, SplitScreenOptions?) -> Unit,
     val remove: (CarCopy) -> Unit,
     val open: (CarCopy) -> Unit,
     /** Opens Android's file picker to save the key backup under the given name. */
@@ -289,8 +290,7 @@ fun HomeScreen(model: HomeModel, actions: HomeActions) {
                             onKeepMedia = { keep -> actions.setKeepMedia(copy, keep) },
                             onUpdateFromFile = { actions.pickApks(copy) },
                             onAutoUpdate = if (model.autoUpdate) ({ allowed -> model.setAutoUpdateAllowed(copy, allowed) }) else null,
-                            onSplitScreen = { on -> actions.setSplitScreen(copy, on) },
-                            onFullHeight = { on -> actions.setFullHeight(copy, on) },
+                            onCarLayout = { layout -> actions.setCarLayout(copy, layout) },
                         )
                     }
                     }
@@ -650,11 +650,18 @@ private fun CarSign(
     onUpdateFromFile: () -> Unit,
     /** Null while automatic updates are off for every copy. */
     onAutoUpdate: ((Boolean) -> Unit)?,
-    onSplitScreen: (Boolean) -> Unit,
-    onFullHeight: (Boolean) -> Unit,
+    onCarLayout: (SplitScreenOptions?) -> Unit,
 ) {
     val signs = LocalSigns.current
     var menu by remember { mutableStateOf(false) }
+    var layoutDialog by remember { mutableStateOf(false) }
+    if (layoutDialog) {
+        CarLayoutDialog(
+            current = copy.splitScreen,
+            onApply = { layout -> layoutDialog = false; onCarLayout(layout) },
+            onDismiss = { layoutDialog = false },
+        )
+    }
     Column(Modifier.fillMaxWidth().padding(horizontal = Gutter, vertical = 4.dp)) {
         if (copy.outdated && copy.updatable) UpdateTab()
         GuidePanel(Modifier.fillMaxWidth()) {
@@ -720,17 +727,9 @@ private fun CarSign(
                         val split = copy.splitScreen
                         if (copy.updatable) {
                             DropdownMenuItem(
-                                // Split screen runs the app on a virtual display that Shizuku starts
-                                text = { Text(if (split != null) "Show full screen" else "Show in split screen (needs Shizuku)") },
+                                text = { Text("Car screen layout…") },
                                 leadingIcon = { Icon(SplitScreenGlyph, contentDescription = null) },
-                                onClick = { menu = false; onSplitScreen(split == null) },
-                            )
-                        }
-                        if (copy.updatable && split != null) {
-                            DropdownMenuItem(
-                                text = { Text(if (split.fullHeight) "Keep the app below the buttons" else "Use the full pane height") },
-                                leadingIcon = { Icon(LandscapeGlyph, contentDescription = null) },
-                                onClick = { menu = false; onFullHeight(!split.fullHeight) },
+                                onClick = { menu = false; layoutDialog = true },
                             )
                         }
                         // Split screen always unlocks portrait and keeps an existing audio player
