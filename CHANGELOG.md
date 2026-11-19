@@ -4,6 +4,7 @@ What changed in each CarBridge release. Dev pre-releases show the Unreleased sec
 
 ## [Unreleased]
 
+- Experimental: show a car copy in Android Auto's split-screen pane, next to the media and notification cards (needs Shizuku)
 - Back up your signing key with a recovery code, and restore it after reinstalling CarBridge so your copies can update again
 - Car copies update automatically while your phone charges, with a per-copy opt-out
 - New Settings screen (gear icon) for key backup and automatic updates

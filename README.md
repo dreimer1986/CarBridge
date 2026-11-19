@@ -22,7 +22,7 @@ Both put an app's full interface on the Android Auto screen, using the same rule
 | Works with | Almost any installed app, including Play Store split APKs | Apps you patch in Morphe Manager, from an APK you provide |
 | Combine with other patches | No | Yes, e.g. Morphe's YouTube patches |
 | After the original updates | CarBridge notifies you; tap **Update** to rebuild the copy | Repatch the new version in Morphe Manager |
-| Options | Per copy, from its ⋮ menu: fill the car screen, keep the audio player | Patch options: Fill the car screen, Keep media services |
+| Options | Per copy, from its ⋮ menu: fill the car screen, keep the audio player, show in split screen | Patch options: Fill the car screen, Keep media services; a separate split-screen patch |
 | What you need | Only the phone | Morphe Manager |
 
 **Use the CarBridge app** for apps you install from a store and don't otherwise modify, like
@@ -119,6 +119,43 @@ verified afterwards with `aapt2`. `-PpatchHeap=256m` mirrors a phone's heap cap:
 ```bash
 JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :patcher:testDebugUnitTest -PpatchFixture=/path/app.apk
 ```
+
+## Split screen (experimental)
+
+A copy's ⋮ menu → **Show in split screen (needs Shizuku)** rebuilds it to show in Android Auto's
+main pane, next to the media and notification cards, instead of full screen. **Show full screen**
+switches back.
+
+What you need:
+
+- [Shizuku](https://shizuku.rikka.app/) installed and running on the phone. The copy asks for
+  Shizuku permission the first time it opens on the car; allow it on the phone. If Shizuku isn't
+  running yet, the car says so, and the app opens by itself once you start it.
+- Android Auto's **Unknown sources** setting, as for any copy.
+
+How it works:
+
+- Opening the copy on the car first shows **For passengers only**. Tap **I'm a passenger** to
+  open the app. Android Auto treats the copy as a navigation app, so it doesn't block it while
+  driving the way it blocks full-screen apps; don't use it while you drive.
+- To leave, open another app from Android Auto's app bar. There's no Exit button: Android Auto
+  keeps a navigation app in the main pane and reopens this one when it closes.
+- Taps, scrolls and flings on the car screen go to the app. Pinch zoom doesn't yet.
+- **Back** at the top right goes back inside the app. On the app's main screen it shows the
+  app's name instead and does nothing, unless the app handles Back in its own code.
+- The app runs on its own display, so it can be open on the phone and the car at the same time.
+- **Use the full pane height** in the ⋮ menu uses the space under Android Auto's button strip
+  too. The app gets more room, but the button covers its top-right corner while it's visible.
+
+Known issues:
+
+- If the copy is reinstalled or force-stopped while it's on the car screen, Android Auto may say
+  the app isn't responding. Tap **Exit** and open it again.
+- Unity games, e.g. 2 Player Games, stay white in the pane. Use the full-screen copy for them.
+
+The car code lives in `splitscreen/host` (added to the copy's classes) and `splitscreen/payload`
+(loaded from the copy's assets), shared with CarBridge Patches; the manifest rules are in
+`core/…/SplitScreenPatch.kt`.
 
 ## Run with the DHU
 
