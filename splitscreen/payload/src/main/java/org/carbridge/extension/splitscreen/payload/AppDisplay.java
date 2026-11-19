@@ -11,15 +11,16 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Rect;
-import android.hardware.display.DisplayManager;
-import android.hardware.display.VirtualDisplay;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
 import android.util.Log;
+import android.view.Display;
+import android.view.InputEvent;
 import android.view.KeyEvent;
+import android.view.MotionEvent;
 import android.view.Surface;
 import android.view.Window;
 
@@ -33,7 +34,8 @@ import java.util.Objects;
 
 /**
  * Runs the app's launcher activity on a virtual display sized to the visible part of the car's
- * map surface, and forwards car input to it. Everything here runs on the main thread.
+ * map surface, and forwards car input to it. The shell service owns the display, see
+ * ShellService. Everything here runs on the main thread.
  */
 final class AppDisplay {
     private static final long LAUNCH_CHECK_MS = 3000;
@@ -66,7 +68,8 @@ final class AppDisplay {
     private final Rect area = new Rect();
     private final Rect pendingArea = new Rect();
     private final Runnable applyArea = this::applyVisibleArea;
-    private VirtualDisplay virtualDisplay;
+    private int displayId = Display.INVALID_DISPLAY;
+    private boolean connecting;
     private int surfaceWidth;
     private int surfaceHeight;
     private int dpi;
@@ -82,8 +85,8 @@ final class AppDisplay {
         this.onBackChanged = onBackChanged;
         compositor = new Compositor(() -> this.onSurfaceStuck.run());
         tracker = new ActivityTracker((Application) context.getApplicationContext());
-        touch = new TouchForwarder(tracker::top);
-        shell = new ShizukuShell(context);
+        touch = new TouchForwarder(this::deliver);
+        shell = new ShizukuShell(context, this::onShellLost);
         fullHeight = readFullHeight(context);
     }
 
@@ -135,7 +138,7 @@ final class AppDisplay {
         compositor.setArea(area);
         compositor.setOutput(surface);
         updateDisplay();
-        if (!tracker.hasActivities()) launch();
+        if (displayId != Display.INVALID_DISPLAY && !tracker.hasActivities()) launch();
         handler.removeCallbacks(checkBack);
         handler.post(checkBack);
     }
@@ -171,12 +174,10 @@ final class AppDisplay {
         handler.removeCallbacksAndMessages(null);
         touch.cancel();
         tracker.stop();
+        // Android moves the display's activities back to the phone screen
+        if (displayId != Display.INVALID_DISPLAY) shell.releaseDisplay();
+        displayId = Display.INVALID_DISPLAY;
         shell.release();
-        if (virtualDisplay != null) {
-            // Android moves the display's activities back to the phone screen
-            virtualDisplay.release();
-            virtualDisplay = null;
-        }
         compositor.release();
     }
 
@@ -225,13 +226,32 @@ final class AppDisplay {
     }
 
     void tap(float x, float y) {
-        if (tracker.top() == null) {
-            // An activity being recreated after a resize has no resumed instance for a moment
-            if (!tracker.hasActivities()) launch();
+        if (displayId == Display.INVALID_DISPLAY) {
+            createDisplay();
+            return;
+        }
+        if (!tracker.hasActivities()) {
+            launch();
             return;
         }
         if (!area.contains((int) x, (int) y)) return;
         touch.tap(x - area.left, y - area.top);
+    }
+
+    /**
+     * Real input through the shell reaches whatever is on top: dialogs, menus, permission prompts.
+     * Without the shell, only the app's own top activity gets it.
+     */
+    private boolean deliver(MotionEvent event) {
+        if (inject(event)) return true;
+        Activity top = tracker.top();
+        if (top == null) return false;
+        top.dispatchTouchEvent(event);
+        return true;
+    }
+
+    private boolean inject(InputEvent event) {
+        return displayId != Display.INVALID_DISPLAY && shell.inject(event, displayId);
     }
 
     void scroll(float distanceX, float distanceY) {
@@ -246,6 +266,8 @@ final class AppDisplay {
         Activity top = tracker.top();
         if (top != null) pressBack(top);
         else if (!tracker.hasActivities()) launch();
+        // A permission prompt or another app's screen on top: Back closes it
+        else pressBackOnDisplay();
         handler.postDelayed(this::returnAfterBack, BACK_RETURN_MS);
         // Show the change right away instead of on the next poll
         handler.removeCallbacks(checkBack);
@@ -256,11 +278,18 @@ final class AppDisplay {
      * A real key event, not onBackPressed(): only the input pipeline reaches the platform's back
      * callbacks, e.g. a toolbar closing its search box.
      */
-    private static void pressBack(Activity activity) {
+    private void pressBack(Activity activity) {
+        if (pressBackOnDisplay()) return;
         long now = SystemClock.uptimeMillis();
         Window window = activity.getWindow();
         window.injectInputEvent(new KeyEvent(now, now, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_BACK, 0));
         window.injectInputEvent(new KeyEvent(now, now, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_BACK, 0));
+    }
+
+    private boolean pressBackOnDisplay() {
+        long now = SystemClock.uptimeMillis();
+        return inject(new KeyEvent(now, now, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_BACK, 0))
+            && inject(new KeyEvent(now, now, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_BACK, 0));
     }
 
     /** Back on a screen wrongly read as a sub-screen may close the app; bring it right back. */
@@ -291,36 +320,70 @@ final class AppDisplay {
     }
 
     private void updateDisplay() {
-        int width = area.width();
-        int height = area.height();
-        if (virtualDisplay == null) {
-            Surface target = compositor.configure(width, height);
-            DisplayManager dm = context.getSystemService(DisplayManager.class);
-            virtualDisplay = dm.createVirtualDisplay(
-                "CarBridge", width, height, dpi, target,
-                DisplayManager.VIRTUAL_DISPLAY_FLAG_OWN_CONTENT_ONLY);
-            tracker.start(virtualDisplay.getDisplay().getDisplayId());
-        } else if (width != displayWidth || height != displayHeight) {
-            Surface target = compositor.configure(width, height);
-            virtualDisplay.resize(width, height, dpi);
-            virtualDisplay.setSurface(target);
-        } else {
+        if (displayId == Display.INVALID_DISPLAY) {
+            createDisplay();
             return;
         }
+        int width = area.width();
+        int height = area.height();
+        if (width == displayWidth && height == displayHeight) return;
+        Surface target = compositor.configure(width, height);
+        shell.resizeDisplay(width, height, dpi, target);
         displayWidth = width;
         displayHeight = height;
         Log.i(TAG, "Virtual display " + width + "x" + height + " @" + dpi + "dpi");
     }
 
+    /** Asks for Shizuku if needed, then has the shell create the display and opens the app. */
+    private void createDisplay() {
+        if (connecting) return;
+        connecting = true;
+        shell.connect(new ShizukuShell.Listener() {
+            @Override
+            public void onReady() {
+                connecting = false;
+                if (displayId != Display.INVALID_DISPLAY || surfaceWidth == 0) return;
+                int width = area.width();
+                int height = area.height();
+                Surface target = compositor.configure(width, height);
+                int id = shell.createDisplay(width, height, dpi, target);
+                if (id == Display.INVALID_DISPLAY) {
+                    toast("Couldn't set up the car screen. Tap to try again");
+                    return;
+                }
+                displayId = id;
+                displayWidth = width;
+                displayHeight = height;
+                tracker.start(id);
+                Log.i(TAG, "Virtual display " + width + "x" + height + " @" + dpi + "dpi");
+                if (!tracker.hasActivities()) launch();
+            }
+
+            @Override
+            public void onProblem(@NonNull String message) {
+                connecting = false;
+                toast(message);
+            }
+        });
+    }
+
+    /** The shell's process died and its display with it; the app's activities went to the phone. */
+    private void onShellLost() {
+        displayId = Display.INVALID_DISPLAY;
+        displayWidth = 0;
+        displayHeight = 0;
+        launching = false;
+        tracker.stop();
+    }
+
     private void launch() {
-        if (virtualDisplay == null || launching) return;
+        if (displayId == Display.INVALID_DISPLAY || launching) return;
         Intent intent = context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());
         ComponentName component = intent == null ? null : intent.getComponent();
         if (component == null) {
             toast("This app has no launcher screen to show");
             return;
         }
-        int displayId = virtualDisplay.getDisplay().getDisplayId();
         launching = true;
 
         // Allowed once any of the app's activities is on the display, e.g. after a Back to root
@@ -334,7 +397,7 @@ final class AppDisplay {
             Log.i(TAG, "First activity on the display needs the shell; asking Shizuku");
         }
 
-        shell.start(component, displayId, new ShizukuShell.Listener() {
+        shell.start(component, displayId, new ShizukuShell.StartListener() {
             @Override
             public void onStarted() {
                 checkLaunched();

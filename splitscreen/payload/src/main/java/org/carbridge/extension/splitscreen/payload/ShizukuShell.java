@@ -15,6 +15,8 @@ import android.os.Looper;
 import android.os.Parcel;
 import android.os.RemoteException;
 import android.util.Log;
+import android.view.InputEvent;
+import android.view.Surface;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -24,18 +26,31 @@ import java.util.concurrent.Executors;
 
 import rikka.shizuku.Shizuku;
 
-/** Places the app's first activity on the car display with Shizuku's shell rights. */
+/** The extension's ShellService, run by Shizuku with shell rights: it owns the car display. */
 final class ShizukuShell {
     interface Listener {
-        void onStarted();
+        void onReady();
 
         /** Something the user must do on the phone, or a failure; shown on the car screen. */
         void onProblem(@NonNull String message);
     }
 
+    interface StartListener {
+        void onStarted();
+
+        void onProblem(@NonNull String message);
+    }
+
     // The extension's ShellService, merged into the app; its class name is also its descriptor
     private static final String SHELL_SERVICE = "org.carbridge.extension.splitscreen.ShellService";
+    // Transaction codes, duplicated from ShellService, which the payload can't reference
     private static final int START_ON_DISPLAY = IBinder.FIRST_CALL_TRANSACTION;
+    private static final int CREATE_DISPLAY = IBinder.FIRST_CALL_TRANSACTION + 1;
+    private static final int RESIZE_DISPLAY = IBinder.FIRST_CALL_TRANSACTION + 2;
+    private static final int RELEASE_DISPLAY = IBinder.FIRST_CALL_TRANSACTION + 3;
+    private static final int INJECT_INPUT = IBinder.FIRST_CALL_TRANSACTION + 4;
+    // Raise with every ShellService change, or Shizuku keeps running the old one
+    private static final int SERVICE_VERSION = 2;
     private static final int REQUEST_CODE = 0xCB;
     // How long to wait for Shizuku before asking the user to start it
     private static final long BINDER_WAIT_MS = 2000;
@@ -47,58 +62,62 @@ final class ShizukuShell {
 
     private final Context context;
     private final String appName;
+    private final Runnable onLost;
     private final Handler main = new Handler(Looper.getMainLooper());
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private final Shizuku.UserServiceArgs serviceArgs;
     private final Shizuku.OnRequestPermissionResultListener permissionListener = this::onPermissionResult;
-    @Nullable private IBinder service;
-    private boolean bound;
-    @Nullable private Request pending;
     private final Shizuku.OnBinderReceivedListener binderListener = this::onBinderReceived;
-    private boolean waitingForBinder;
     private final Runnable binderTimeout = this::onBinderTimeout;
     private final Runnable askManagerForBinder = this::askManagerForBinder;
-
-    private static final class Request {
-        final String component;
-        final int displayId;
-        final Listener listener;
-
-        Request(String component, int displayId, Listener listener) {
-            this.component = component;
-            this.displayId = displayId;
-            this.listener = listener;
-        }
-    }
+    @Nullable private IBinder service;
+    private boolean bound;
+    private boolean waitingForBinder;
+    @Nullable private Listener pending;
 
     private final ServiceConnection connection = new ServiceConnection() {
         @Override
         public void onServiceConnected(ComponentName name, IBinder binder) {
             if (binder == null || !binder.pingBinder()) return;
             service = binder;
-            runPending();
+            Listener listener = pending;
+            pending = null;
+            if (listener != null) listener.onReady();
         }
 
         @Override
         public void onServiceDisconnected(ComponentName name) {
             service = null;
             bound = false;
+            Log.w(TAG, "The Shizuku service stopped");
+            onLost.run();
         }
     };
 
-    ShizukuShell(@NonNull Context context) {
+    /** [onLost] runs when the service dies, taking the car display with it. */
+    ShizukuShell(@NonNull Context context, @NonNull Runnable onLost) {
         this.context = context;
+        this.onLost = onLost;
         appName = context.getApplicationInfo().loadLabel(context.getPackageManager()).toString();
         serviceArgs = new Shizuku.UserServiceArgs(
             new ComponentName(context.getPackageName(), SHELL_SERVICE))
             .processNameSuffix("carbridge_shell")
             .daemon(false)
             .debuggable(false)
-            .version(1);
+            .version(SERVICE_VERSION);
     }
 
-    void start(@NonNull ComponentName component, int displayId, @NonNull Listener listener) {
-        pending = new Request(component.flattenToString(), displayId, listener);
+    boolean isReady() {
+        return service != null;
+    }
+
+    /** Calls [listener] once the service runs, asking the user for Shizuku first if needed. */
+    void connect(@NonNull Listener listener) {
+        if (service != null) {
+            listener.onReady();
+            return;
+        }
+        pending = listener;
         if (Shizuku.pingBinder()) {
             usePending();
             return;
@@ -111,6 +130,85 @@ final class ShizukuShell {
         }
         main.removeCallbacks(binderTimeout);
         main.postDelayed(binderTimeout, BINDER_WAIT_MS);
+    }
+
+    /** Returns the new display's id, or -1. */
+    int createDisplay(int width, int height, int dpi, @NonNull Surface surface) {
+        Parcel reply = call(CREATE_DISPLAY, data -> {
+            data.writeInt(width);
+            data.writeInt(height);
+            data.writeInt(dpi);
+            data.writeTypedObject(surface, 0);
+        }, 0);
+        if (reply == null) return -1;
+        try {
+            return reply.readInt();
+        } finally {
+            reply.recycle();
+        }
+    }
+
+    void resizeDisplay(int width, int height, int dpi, @NonNull Surface surface) {
+        Parcel reply = call(RESIZE_DISPLAY, data -> {
+            data.writeInt(width);
+            data.writeInt(height);
+            data.writeInt(dpi);
+            data.writeTypedObject(surface, 0);
+        }, 0);
+        if (reply != null) reply.recycle();
+    }
+
+    void releaseDisplay() {
+        call(RELEASE_DISPLAY, data -> { }, IBinder.FLAG_ONEWAY);
+    }
+
+    /** Sends [event] to the car display as real input; false when the service isn't running. */
+    boolean inject(@NonNull InputEvent event, int displayId) {
+        if (service == null) return false;
+        call(INJECT_INPUT, data -> {
+            data.writeInt(displayId);
+            data.writeTypedObject(event, 0);
+        }, IBinder.FLAG_ONEWAY);
+        return true;
+    }
+
+    /** Starts [component] on [displayId] with the shell's rights. Needs [connect] first. */
+    void start(@NonNull ComponentName component, int displayId, @NonNull StartListener listener) {
+        IBinder binder = service;
+        if (binder == null) {
+            listener.onProblem("Couldn't connect to Shizuku. Tap to try again");
+            return;
+        }
+        // am start takes a moment; keep it off the main thread
+        worker.execute(() -> {
+            String error = startOnDisplay(binder, component.flattenToString(), displayId);
+            main.post(() -> {
+                if (error == null) {
+                    listener.onStarted();
+                } else {
+                    Log.w(TAG, "Shell start failed: " + error);
+                    listener.onProblem("Couldn't open the app on the car screen. Tap to try again");
+                }
+            });
+        });
+    }
+
+    void release() {
+        stopWaitingForBinder();
+        main.removeCallbacksAndMessages(null);
+        pending = null;
+        Shizuku.removeRequestPermissionResultListener(permissionListener);
+        if (bound) {
+            try {
+                // Removing the service also releases its display
+                Shizuku.unbindUserService(serviceArgs, connection, true);
+            } catch (RuntimeException e) {
+                Log.w(TAG, "Unbinding the Shizuku service failed", e);
+            }
+            bound = false;
+        }
+        service = null;
+        worker.shutdown();
     }
 
     /**
@@ -146,9 +244,9 @@ final class ShizukuShell {
 
     // The request stays pending, so the app still opens once the binder arrives
     private void onBinderTimeout() {
-        Request request = pending;
-        if (request != null) {
-            request.listener.onProblem("Start Shizuku on your phone. " + appName + " opens here once it's running");
+        Listener listener = pending;
+        if (listener != null) {
+            listener.onProblem("Start Shizuku on your phone. " + appName + " opens here once it's running");
         }
     }
 
@@ -167,102 +265,93 @@ final class ShizukuShell {
     }
 
     private void usePending() {
-        Request request = pending;
-        if (request == null) return;
+        Listener listener = pending;
+        if (listener == null) return;
         if (Shizuku.isPreV11()) {
             pending = null;
-            request.listener.onProblem("Update Shizuku on your phone, then tap here");
+            listener.onProblem("Update Shizuku on your phone, then tap here");
             return;
         }
         if (Shizuku.checkSelfPermission() != PackageManager.PERMISSION_GRANTED) {
             if (Shizuku.shouldShowRequestPermissionRationale()) {
                 pending = null;
-                request.listener.onProblem("Allow " + appName + " in the Shizuku app on your phone, then tap here");
+                listener.onProblem("Allow " + appName + " in the Shizuku app on your phone, then tap here");
                 return;
             }
             Shizuku.addRequestPermissionResultListener(permissionListener);
             Shizuku.requestPermission(REQUEST_CODE);
-            request.listener.onProblem("Allow " + appName + " in the Shizuku prompt on your phone");
+            listener.onProblem("Allow " + appName + " in the Shizuku prompt on your phone");
             return;
         }
-        runPending();
-    }
-
-    void release() {
-        stopWaitingForBinder();
-        main.removeCallbacksAndMessages(null);
-        pending = null;
-        Shizuku.removeRequestPermissionResultListener(permissionListener);
-        if (bound) {
-            try {
-                Shizuku.unbindUserService(serviceArgs, connection, true);
-            } catch (RuntimeException e) {
-                Log.w(TAG, "Unbinding the Shizuku service failed", e);
-            }
-            bound = false;
-        }
-        service = null;
-        worker.shutdown();
+        bind();
     }
 
     private void onPermissionResult(int requestCode, int grantResult) {
         if (requestCode != REQUEST_CODE) return;
         Shizuku.removeRequestPermissionResultListener(permissionListener);
-        Request request = pending;
-        if (request == null) return;
+        Listener listener = pending;
+        if (listener == null) return;
         if (grantResult == PackageManager.PERMISSION_GRANTED) {
-            runPending();
+            bind();
         } else {
             pending = null;
-            request.listener.onProblem("Shizuku access was denied. Allow it in the Shizuku app, then tap here");
+            listener.onProblem("Shizuku access was denied. Allow it in the Shizuku app, then tap here");
         }
     }
 
-    private void runPending() {
-        Request request = pending;
-        if (request == null) return;
-        IBinder binder = service;
-        if (binder == null) {
-            if (!bound) {
-                try {
-                    Shizuku.bindUserService(serviceArgs, connection);
-                    bound = true;
-                } catch (RuntimeException e) {
-                    Log.w(TAG, "Binding the Shizuku service failed", e);
-                    pending = null;
-                    request.listener.onProblem("Couldn't connect to Shizuku. Tap to try again");
-                }
-            }
-            return;
+    private void bind() {
+        if (bound) return;
+        try {
+            Shizuku.bindUserService(serviceArgs, connection);
+            bound = true;
+        } catch (RuntimeException e) {
+            Log.w(TAG, "Binding the Shizuku service failed", e);
+            Listener listener = pending;
+            pending = null;
+            if (listener != null) listener.onProblem("Couldn't connect to Shizuku. Tap to try again");
         }
-        pending = null;
-        // am start takes a moment; keep it off the main thread
-        worker.execute(() -> {
-            String error = transact(binder, request);
-            main.post(() -> {
-                if (error == null) {
-                    request.listener.onStarted();
-                } else {
-                    Log.w(TAG, "Shell start failed: " + error);
-                    request.listener.onProblem("Couldn't open the app on the car screen. Tap to try again");
-                }
-            });
-        });
+    }
+
+    private interface Writer {
+        void write(Parcel data);
+    }
+
+    /** Returns the reply, positioned after its exception header, or null on failure or oneway. */
+    @Nullable
+    private Parcel call(int code, Writer writer, int flags) {
+        IBinder binder = service;
+        if (binder == null) return null;
+        boolean oneway = (flags & IBinder.FLAG_ONEWAY) != 0;
+        Parcel data = Parcel.obtain();
+        Parcel reply = oneway ? null : Parcel.obtain();
+        try {
+            data.writeInterfaceToken(SHELL_SERVICE);
+            writer.write(data);
+            binder.transact(code, data, reply, flags);
+            if (reply == null) return null;
+            reply.readException();
+            return reply;
+        } catch (RemoteException | RuntimeException e) {
+            Log.w(TAG, "Shell call " + code + " failed", e);
+            if (reply != null) reply.recycle();
+            return null;
+        } finally {
+            data.recycle();
+        }
     }
 
     @Nullable
-    private String transact(IBinder binder, Request request) {
+    private static String startOnDisplay(IBinder binder, String component, int displayId) {
         Parcel data = Parcel.obtain();
         Parcel reply = Parcel.obtain();
         try {
             data.writeInterfaceToken(SHELL_SERVICE);
-            data.writeString(request.component);
-            data.writeInt(request.displayId);
+            data.writeString(component);
+            data.writeInt(displayId);
             binder.transact(START_ON_DISPLAY, data, reply, 0);
             reply.readException();
             return reply.readString();
         } catch (RemoteException | RuntimeException e) {
-            service = null;
             return e.toString();
         } finally {
             data.recycle();
