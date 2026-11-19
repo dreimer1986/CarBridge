@@ -51,6 +51,8 @@ class MainActivity : ComponentActivity() {
             openMorphe = { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(MORPHE_SOURCE))) },
             setFillScreen = model::setFillScreen,
             setKeepMedia = model::setKeepMedia,
+            setSplitScreen = model::setSplitScreen,
+            setFullHeight = model::setFullHeight,
             remove = { copy -> startActivity(Intent(Intent.ACTION_DELETE, Uri.parse("package:${copy.packageName}"))) },
             open = { copy -> packageManager.getLaunchIntentForPackage(copy.packageName)?.let(::startActivity) },
             saveBackup = saveBackup::launch,

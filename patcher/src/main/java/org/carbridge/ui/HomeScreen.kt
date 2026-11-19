@@ -145,6 +145,8 @@ class HomeActions(
     val openMorphe: () -> Unit,
     val setFillScreen: (CarCopy, Boolean) -> Unit,
     val setKeepMedia: (CarCopy, Boolean) -> Unit,
+    val setSplitScreen: (CarCopy, Boolean) -> Unit,
+    val setFullHeight: (CarCopy, Boolean) -> Unit,
     val remove: (CarCopy) -> Unit,
     val open: (CarCopy) -> Unit,
     /** Opens Android's file picker to save the key backup under the given name. */
@@ -287,6 +289,8 @@ fun HomeScreen(model: HomeModel, actions: HomeActions) {
                             onKeepMedia = { keep -> actions.setKeepMedia(copy, keep) },
                             onUpdateFromFile = { actions.pickApks(copy) },
                             onAutoUpdate = if (model.autoUpdate) ({ allowed -> model.setAutoUpdateAllowed(copy, allowed) }) else null,
+                            onSplitScreen = { on -> actions.setSplitScreen(copy, on) },
+                            onFullHeight = { on -> actions.setFullHeight(copy, on) },
                         )
                     }
                     }
@@ -646,6 +650,8 @@ private fun CarSign(
     onUpdateFromFile: () -> Unit,
     /** Null while automatic updates are off for every copy. */
     onAutoUpdate: ((Boolean) -> Unit)?,
+    onSplitScreen: (Boolean) -> Unit,
+    onFullHeight: (Boolean) -> Unit,
 ) {
     val signs = LocalSigns.current
     var menu by remember { mutableStateOf(false) }
@@ -711,14 +717,31 @@ private fun CarSign(
                                 onClick = { menu = false; onUpdate() },
                             )
                         }
-                        if (copy.updatable && copy.portraitLocked) {
+                        val split = copy.splitScreen
+                        if (copy.updatable) {
+                            DropdownMenuItem(
+                                // Split screen runs the app on a virtual display that Shizuku starts
+                                text = { Text(if (split != null) "Show full screen" else "Show in split screen (needs Shizuku)") },
+                                leadingIcon = { Icon(SplitScreenGlyph, contentDescription = null) },
+                                onClick = { menu = false; onSplitScreen(split == null) },
+                            )
+                        }
+                        if (copy.updatable && split != null) {
+                            DropdownMenuItem(
+                                text = { Text(if (split.fullHeight) "Keep the app below the buttons" else "Use the full pane height") },
+                                leadingIcon = { Icon(LandscapeGlyph, contentDescription = null) },
+                                onClick = { menu = false; onFullHeight(!split.fullHeight) },
+                            )
+                        }
+                        // Split screen always unlocks portrait and keeps an existing audio player
+                        if (copy.updatable && split == null && copy.portraitLocked) {
                             DropdownMenuItem(
                                 text = { Text(if (copy.options.fillScreen) "Keep portrait layout" else "Fill the car screen") },
                                 leadingIcon = { Icon(LandscapeGlyph, contentDescription = null) },
                                 onClick = { menu = false; onFillScreen(!copy.options.fillScreen) },
                             )
                         }
-                        if (copy.updatable && copy.hasMediaService) {
+                        if (copy.updatable && split == null && copy.hasMediaService) {
                             val keep = copy.options.keepMediaServices
                             DropdownMenuItem(
                                 // Kept media services let Android Auto show its audio player for the copy

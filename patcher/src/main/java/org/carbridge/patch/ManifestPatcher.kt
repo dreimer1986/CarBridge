@@ -13,6 +13,8 @@ import org.carbridge.core.CarOptions
 import org.carbridge.core.CarPatch
 import org.carbridge.core.ManifestElement
 import org.carbridge.core.ManifestHost
+import org.carbridge.core.SplitScreenOptions
+import org.carbridge.core.SplitScreenPatch
 
 /**
  * Applies the shared [CarPatch] rules to binary XML with ARSCLib, then the copy-only steps:
@@ -23,11 +25,28 @@ class ManifestPatcher(private val log: (String) -> Unit) {
     /** How the car copy presents itself; icon layers are PNGs for an adaptive icon. */
     class Branding(val label: String, val iconBackground: ByteArray?, val iconForeground: ByteArray?)
 
-    fun patch(apk: ApkModule, newPackage: String?, branding: Branding? = null, options: CarOptions = CarOptions()) {
+    /** The split-screen code [SplitScreenPatch] needs beside its manifest changes. */
+    class SplitScreenCode(val hostDex: ByteArray, val payloadDex: ByteArray, val carAppApiLevel: ByteArray)
+
+    /** With [splitScreen], shows the app in Android Auto's split-screen pane instead of full screen. */
+    fun patch(
+        apk: ApkModule,
+        newPackage: String?,
+        branding: Branding? = null,
+        options: CarOptions = CarOptions(),
+        splitScreen: Pair<SplitScreenOptions, SplitScreenCode>? = null,
+    ) {
         val manifest = apk.androidManifest ?: error("APK has no AndroidManifest.xml")
         val app = manifest.applicationElement ?: error("manifest has no <application>")
 
-        CarPatch.apply(ArscHost(apk, manifest, app), options)
+        val host = ArscHost(apk, manifest, app)
+        if (splitScreen == null) {
+            CarPatch.apply(host, options)
+        } else {
+            // The rename below moves the Shizuku provider's authority to the new package
+            SplitScreenPatch.apply(host, manifest.packageName ?: error("manifest has no package name"), splitScreen.first)
+            addSplitScreenCode(apk, splitScreen.second)
+        }
         if (branding != null) applyBranding(apk, app, branding)
         if (newPackage != null) renamePackage(apk, manifest, newPackage)
         apk.refreshManifest()
@@ -58,11 +77,12 @@ class ManifestPatcher(private val log: (String) -> Unit) {
             block.addUsesPermission(name)
         }
 
-        override fun addAutomotiveDescriptor(name: String, uses: String) {
+        override fun addAutomotiveDescriptor(name: String, vararg uses: String) {
             val path = "res/xml/$name.xml"
             pkg.getOrCreate("", "xml", name).setValueAsString(path)
             val doc = ResXmlDocument()
-            doc.newElement("automotiveApp").newElement("uses").getOrCreateAttribute("name", 0).setValueAsString(uses)
+            val root = doc.newElement("automotiveApp")
+            for (use in uses) root.newElement("uses").getOrCreateAttribute("name", 0).setValueAsString(use)
             doc.refreshFull()
             apk.add(ByteInputSource(doc.bytes, path))
         }
@@ -151,6 +171,15 @@ class ManifestPatcher(private val log: (String) -> Unit) {
         entry.setValueAsString(path)
         apk.add(ByteInputSource(bytes, path))
         return entry.resourceId
+    }
+
+    /** The host dex joins the app's own; the payload stays apart, loaded from the assets. */
+    private fun addSplitScreenCode(apk: ApkModule, code: SplitScreenCode) {
+        val dex = generateSequence(2) { it + 1 }.map { "classes$it.dex" }.first { !apk.containsFile(it) }
+        apk.add(ByteInputSource(code.hostDex, dex))
+        apk.add(ByteInputSource(code.payloadDex, SplitScreenPatch.PAYLOAD_DEX_ASSET))
+        apk.add(ByteInputSource(code.carAppApiLevel, SplitScreenPatch.CAR_APP_API_LEVEL_ASSET))
+        log("Split screen: added $dex and the car code")
     }
 
     private fun launcherActivities(app: ResXmlElement) =

@@ -5,6 +5,7 @@ import android.content.pm.ApplicationInfo
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import org.carbridge.core.CarOptions
+import org.carbridge.core.SplitScreenOptions
 import org.carbridge.patch.PatchFailure
 import org.carbridge.patch.PatchPipeline
 
@@ -33,7 +34,7 @@ object CopyBuilder {
         val carPackage = PatchPipeline.carPackageName(app.packageName)
         if (!_building.compareAndSet(null, carPackage)) return false
         try {
-            val apks = PatchPipeline(context, log).patch(app, options(context, app.packageName))
+            val apks = PatchPipeline(context, log).patch(app, options(context, app.packageName), splitScreenOptions(context, app.packageName))
             onPatched()
             if (!ShizukuMode.install(context, apks, carPackage, background, log)) {
                 Installer.install(context, apks, carPackage, background)
@@ -53,6 +54,13 @@ object CopyBuilder {
             keepMediaServices = prefs.getBoolean("keep_media:$originalPackage", false),
             fillScreen = !prefs.getBoolean("keep_portrait:$originalPackage", false),
         )
+    }
+
+    /** Set when the copy shows in Android Auto's split-screen pane; off by default. */
+    fun splitScreenOptions(context: Context, originalPackage: String): SplitScreenOptions? {
+        val prefs = context.getSharedPreferences("setup", 0)
+        if (!prefs.getBoolean("split_screen:$originalPackage", false)) return null
+        return SplitScreenOptions(fullHeight = prefs.getBoolean("full_height:$originalPackage", false))
     }
 
     /** A build failure in words the user can act on. */

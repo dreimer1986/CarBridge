@@ -14,6 +14,7 @@ import java.io.File
 import org.carbridge.core.CarOptions
 import org.carbridge.core.CarPatch
 import org.carbridge.patch.KeystoreSigner
+import org.carbridge.core.SplitScreenOptions
 import org.carbridge.patch.PatchPipeline
 
 /** An app the user can add to the car. */
@@ -57,6 +58,8 @@ data class CarCopy(
     val fromFile: Boolean = false,
     /** The user hasn't opted this copy out of automatic updates. */
     val autoUpdateAllowed: Boolean = true,
+    /** Set when the copy shows in Android Auto's split-screen pane instead of full screen. */
+    val splitScreen: SplitScreenOptions?,
 ) {
     /** A key backup could make this copy updatable again. */
     val needsRestore get() = signedElsewhere && !madeByOtherCarBridge
@@ -75,7 +78,10 @@ data class Catalog(val copies: List<CarCopy>, val available: List<SourceApp>)
 object AppCatalog {
     private const val ICON_PX = 144
 
-    fun load(context: Context, options: (String) -> CarOptions): Catalog {
+    fun load(
+        context: Context,
+        options: (String) -> CarOptions,
+    ): Catalog {
         val pm = context.packageManager
         val launcher = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
         val launchable = pm.queryIntentActivities(launcher, 0)
@@ -127,6 +133,7 @@ object AppCatalog {
                 madeByOtherCarBridge = installer(pm, info.packageName).let { by ->
                     by != null && by != context.packageName && (by == CARBRIDGE_ID || by.startsWith("$CARBRIDGE_ID.")) && isInstalled(pm, by)
                 },
+                splitScreen = CopyBuilder.splitScreenOptions(context, originalPkg),
             )
         }.sortedWith(compareBy({ !it.outdated }, { it.label.lowercase() }))
 

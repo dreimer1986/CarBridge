@@ -383,6 +383,20 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
 
     private fun carOptions(originalPackage: String) = CopyBuilder.options(getApplication(), originalPackage)
 
+    /** Saves the split-screen choice and rebuilds the copy with it. */
+    fun setSplitScreen(copy: CarCopy, on: Boolean) {
+        val original = copy.original ?: return
+        prefs.edit().putBoolean("split_screen:${original.info.packageName}", on).apply()
+        add(original, update = true)
+    }
+
+    /** Saves the split-screen pane height and rebuilds the copy with it. */
+    fun setFullHeight(copy: CarCopy, on: Boolean) {
+        val original = copy.original ?: return
+        prefs.edit().putBoolean("full_height:${original.info.packageName}", on).apply()
+        add(original, update = true)
+    }
+
     /** Saves the layout choice and rebuilds the copy with it. */
     fun setFillScreen(copy: CarCopy, fill: Boolean) {
         val original = copy.original ?: return
@@ -503,7 +517,7 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
         }
         val step = when {
             line.startsWith("Signing") -> JobStep.Sign
-            line.startsWith("Car-enabled") || line.startsWith("Renamed") -> JobStep.Patch
+            line.startsWith("Car-enabled") || line.startsWith("Split screen") || line.startsWith("Renamed") -> JobStep.Patch
             else -> null
         } ?: return
         viewModelScope.launch { job = job?.copy(step = maxOf(job?.step ?: 0, step.ordinal)) }

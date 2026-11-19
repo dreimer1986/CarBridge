@@ -45,8 +45,8 @@ interface ManifestHost {
     /** Adds `<uses-permission>`, which must come before `<application>`. */
     fun addPermission(name: String)
 
-    /** Writes `res/xml/<name>.xml` as `<automotiveApp><uses name="[uses]"/></automotiveApp>`. */
-    fun addAutomotiveDescriptor(name: String, uses: String)
+    /** Writes `res/xml/<name>.xml` as `<automotiveApp>` with a `<uses name=…/>` per [uses]. */
+    fun addAutomotiveDescriptor(name: String, vararg uses: String)
 
     fun log(message: String)
 }

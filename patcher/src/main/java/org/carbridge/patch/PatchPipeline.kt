@@ -1,6 +1,7 @@
 package org.carbridge.patch
 
 import org.carbridge.core.CarOptions
+import org.carbridge.core.SplitScreenOptions
 
 import android.content.Context
 import android.content.pm.ApplicationInfo
@@ -15,7 +16,7 @@ class PatchFailure(message: String) : Exception(message)
 /** Original APK(s) in, signed car-enabled APK(s) out, base first. Runs off the main thread. */
 class PatchPipeline(private val context: Context, private val log: (String) -> Unit) {
 
-    fun patch(app: ApplicationInfo, options: CarOptions): List<File> {
+    fun patch(app: ApplicationInfo, options: CarOptions, splitScreen: SplitScreenOptions? = null): List<File> {
         val work = workDir(context).apply { deleteRecursively(); mkdirs() }
         val newPackage = carPackageName(app.packageName)
         val splits = app.splitSourceDirs.orEmpty().map(::File)
@@ -35,7 +36,8 @@ class PatchPipeline(private val context: Context, private val log: (String) -> U
         val patcher = ManifestPatcher(log)
         val unsignedBase = File(work, "base.unsigned.apk")
         val branding = IconBadger.branding(context, app)
-        val minSdk = rewrite(base, unsignedBase) { apk -> patcher.patch(apk, newPackage, branding, options) }
+        val split = splitScreen?.let { it to splitScreenCode() }
+        val minSdk = rewrite(base, unsignedBase) { apk -> patcher.patch(apk, newPackage, branding, options, split) }
         val unsignedSplits = splits.mapIndexed { i, split ->
             File(work, "split$i.unsigned.apk").also { out ->
                 rewrite(split, out) { apk -> patcher.patchSplit(apk, newPackage) }
@@ -59,6 +61,16 @@ class PatchPipeline(private val context: Context, private val log: (String) -> U
         val restored = if (signing.lineage != null) " (restored key)" else ""
         log("Signed with ${signing.fingerprint.take(17)}…$restored")
         return signed
+    }
+
+    /** Built from the splitscreen modules into this app's assets, see patcher/build.gradle.kts. */
+    private fun splitScreenCode(): ManifestPatcher.SplitScreenCode {
+        fun asset(name: String) = context.assets.open("splitscreen/$name").use { it.readBytes() }
+        return ManifestPatcher.SplitScreenCode(
+            hostDex = asset("splitscreen-host.dex"),
+            payloadDex = asset("splitscreen-payload.dex"),
+            carAppApiLevel = asset("car-app-api.level"),
+        )
     }
 
     companion object {

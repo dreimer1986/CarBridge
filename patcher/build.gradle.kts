@@ -105,3 +105,27 @@ tasks.withType<Test>().configureEach {
     project.findProperty("patchHeap")?.let { maxHeapSize = it.toString() }
     systemProperty("patchOut", layout.buildDirectory.file("patch-test/out.apk").get().asFile.path)
 }
+
+// The split-screen code added to copies: the host dex, the payload dex and the payload's Car App
+// Library API level, taken from the two shrunk splitscreen APKs
+val splitScreenAssets = tasks.register<Copy>("splitScreenAssets") {
+    val host = project(":splitscreen:host")
+    val payload = project(":splitscreen:payload")
+    dependsOn(host.tasks.named("assembleRelease"), payload.tasks.named("assembleRelease"))
+    from(zipTree(host.layout.buildDirectory.file("outputs/apk/release/host-release-unsigned.apk"))) {
+        include("classes.dex")
+        rename { "splitscreen-host.dex" }
+    }
+    from(zipTree(payload.layout.buildDirectory.file("outputs/apk/release/payload-release-unsigned.apk"))) {
+        include("classes.dex", "car-app-api.level")
+        rename("classes.dex", "splitscreen-payload.dex")
+    }
+    into(layout.buildDirectory.dir("generated/splitScreenAssets/splitscreen"))
+}
+
+android.sourceSets.named("main") {
+    assets.srcDir(splitScreenAssets.map { it.destinationDir.parentFile })
+}
+
+// The source set above can't carry the task dependency
+tasks.named("preBuild") { dependsOn(splitScreenAssets) }

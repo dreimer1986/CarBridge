@@ -15,3 +15,5 @@ dependencyResolutionManagement {
 rootProject.name = "aa-launcher-spike"
 include(":core")
 include(":patcher")
+include(":splitscreen:host")
+include(":splitscreen:payload")
