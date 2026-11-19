@@ -4,8 +4,11 @@ import static org.carbridge.extension.splitscreen.payload.AppScreen.TAG;
 
 import android.content.ComponentName;
 import android.content.Context;
+import android.content.Intent;
 import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
+import android.os.Binder;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
@@ -34,8 +37,13 @@ final class ShizukuShell {
     private static final String SHELL_SERVICE = "org.carbridge.extension.splitscreen.ShellService";
     private static final int START_ON_DISPLAY = IBinder.FIRST_CALL_TRANSACTION;
     private static final int REQUEST_CODE = 0xCB;
-    // Shizuku sends its binder shortly after the app process starts
+    // How long to wait for Shizuku before asking the user to start it
     private static final long BINDER_WAIT_MS = 2000;
+    // The Shizuku app's binder hand-out, see its ShellBinderRequestHandler
+    private static final String MANAGER_PACKAGE = "moe.shizuku.privileged.api";
+    private static final String MANAGER_REQUEST_BINDER = "rikka.shizuku.intent.action.REQUEST_BINDER";
+    private static final int MANAGER_REPLY = 1;
+    private static final long MANAGER_ASK_MS = 3000;
 
     private final Context context;
     private final String appName;
@@ -46,6 +54,10 @@ final class ShizukuShell {
     @Nullable private IBinder service;
     private boolean bound;
     @Nullable private Request pending;
+    private final Shizuku.OnBinderReceivedListener binderListener = this::onBinderReceived;
+    private boolean waitingForBinder;
+    private final Runnable binderTimeout = this::onBinderTimeout;
+    private final Runnable askManagerForBinder = this::askManagerForBinder;
 
     private static final class Request {
         final String component;
@@ -86,45 +98,98 @@ final class ShizukuShell {
     }
 
     void start(@NonNull ComponentName component, int displayId, @NonNull Listener listener) {
-        if (!Shizuku.pingBinder()) {
-            waitForBinder(component, displayId, listener);
-            return;
-        }
-        if (Shizuku.isPreV11()) {
-            listener.onProblem("Update Shizuku on your phone, then tap here");
-            return;
-        }
         pending = new Request(component.flattenToString(), displayId, listener);
+        if (Shizuku.pingBinder()) {
+            usePending();
+            return;
+        }
+        // Stays registered past the timeout: after Shizuku starts, its binder can take a while
+        if (!waitingForBinder) {
+            waitingForBinder = true;
+            Shizuku.addBinderReceivedListener(binderListener, main);
+            askManagerForBinder.run();
+        }
+        main.removeCallbacks(binderTimeout);
+        main.postDelayed(binderTimeout, BINDER_WAIT_MS);
+    }
+
+    /**
+     * Shizuku only sends its binder to an app when the app's process starts or changes state, so
+     * a process that was already running when Shizuku started never gets it. The Shizuku app
+     * hands it out on request, as it does for its rish shell; ask until it has one.
+     */
+    private void askManagerForBinder() {
+        Binder reply = new Binder() {
+            @Override
+            protected boolean onTransact(int code, @NonNull Parcel data, @Nullable Parcel out, int flags)
+                    throws RemoteException {
+                if (code != MANAGER_REPLY) return super.onTransact(code, data, out, flags);
+                IBinder binder = data.readStrongBinder();
+                if (binder != null && binder.pingBinder()) {
+                    main.post(() -> {
+                        if (!Shizuku.pingBinder()) Shizuku.onBinderReceived(binder, context.getPackageName());
+                    });
+                }
+                return true;
+            }
+        };
+        Bundle extras = new Bundle();
+        extras.putBinder("binder", reply);
+        Intent request = new Intent(MANAGER_REQUEST_BINDER).setPackage(MANAGER_PACKAGE).putExtra("data", extras);
+        try {
+            context.sendBroadcast(request);
+        } catch (RuntimeException e) {
+            Log.w(TAG, "Asking the Shizuku app for its binder failed", e);
+        }
+        main.postDelayed(askManagerForBinder, MANAGER_ASK_MS);
+    }
+
+    // The request stays pending, so the app still opens once the binder arrives
+    private void onBinderTimeout() {
+        Request request = pending;
+        if (request != null) {
+            request.listener.onProblem("Start Shizuku on your phone. " + appName + " opens here once it's running");
+        }
+    }
+
+    private void onBinderReceived() {
+        stopWaitingForBinder();
+        if (pending != null) usePending();
+    }
+
+    private void stopWaitingForBinder() {
+        main.removeCallbacks(binderTimeout);
+        main.removeCallbacks(askManagerForBinder);
+        if (waitingForBinder) {
+            waitingForBinder = false;
+            Shizuku.removeBinderReceivedListener(binderListener);
+        }
+    }
+
+    private void usePending() {
+        Request request = pending;
+        if (request == null) return;
+        if (Shizuku.isPreV11()) {
+            pending = null;
+            request.listener.onProblem("Update Shizuku on your phone, then tap here");
+            return;
+        }
         if (Shizuku.checkSelfPermission() != PackageManager.PERMISSION_GRANTED) {
             if (Shizuku.shouldShowRequestPermissionRationale()) {
                 pending = null;
-                listener.onProblem("Allow " + appName + " in the Shizuku app on your phone, then tap here");
+                request.listener.onProblem("Allow " + appName + " in the Shizuku app on your phone, then tap here");
                 return;
             }
             Shizuku.addRequestPermissionResultListener(permissionListener);
             Shizuku.requestPermission(REQUEST_CODE);
-            listener.onProblem("Allow " + appName + " in the Shizuku prompt on your phone");
+            request.listener.onProblem("Allow " + appName + " in the Shizuku prompt on your phone");
             return;
         }
         runPending();
     }
 
-    private void waitForBinder(ComponentName component, int displayId, Listener listener) {
-        Shizuku.OnBinderReceivedListener[] received = new Shizuku.OnBinderReceivedListener[1];
-        Runnable timeout = () -> {
-            Shizuku.removeBinderReceivedListener(received[0]);
-            listener.onProblem("Start Shizuku on your phone, then tap here");
-        };
-        received[0] = () -> {
-            Shizuku.removeBinderReceivedListener(received[0]);
-            main.removeCallbacks(timeout);
-            start(component, displayId, listener);
-        };
-        main.postDelayed(timeout, BINDER_WAIT_MS);
-        Shizuku.addBinderReceivedListener(received[0], main);
-    }
-
     void release() {
+        stopWaitingForBinder();
         main.removeCallbacksAndMessages(null);
         pending = null;
         Shizuku.removeRequestPermissionResultListener(permissionListener);
