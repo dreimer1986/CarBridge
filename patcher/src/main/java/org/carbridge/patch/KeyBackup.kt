@@ -5,6 +5,7 @@ import com.android.apksig.SigningCertificateLineage
 import java.io.ByteArrayOutputStream
 import java.io.DataInputStream
 import java.io.DataOutputStream
+import java.nio.ByteBuffer
 import java.security.GeneralSecurityException
 import java.security.KeyFactory
 import java.security.PrivateKey
@@ -55,18 +56,26 @@ class KeyBackup(
         val nonce = random(NONCE_BYTES)
         val header = MAGIC + version + salt + nonce
         val cipher = cipher(Cipher.ENCRYPT_MODE, normalize(code), salt, nonce, header)
-        return header + cipher.doFinal(encodeContents(version))
+        val plain = encodeContents(version)
+        try {
+            return header + cipher.doFinal(plain)
+        } finally {
+            plain.fill(0)
+        }
     }
 
-    private fun encodeContents(version: Byte): ByteArray = ByteArrayOutputStream().also { bytes ->
-        DataOutputStream(bytes).use { out ->
-            val parts = listOf(key.encoded, cert.encoded, lineage.bytes) + if (version >= 2) listOf(encodeCopies()) else emptyList()
-            for (part in parts) {
-                out.writeInt(part.size)
-                out.write(part)
-            }
+    /** Laid out in one exact-size array, unlike a stream's growing buffers, so it can be wiped. */
+    private fun encodeContents(version: Byte): ByteArray {
+        val keyBytes = key.encoded
+        try {
+            val parts = listOf(keyBytes, cert.encoded, lineage.bytes) + if (version >= 2) listOf(encodeCopies()) else emptyList()
+            val out = ByteBuffer.allocate(parts.sumOf { Int.SIZE_BYTES + it.size })
+            for (part in parts) out.putInt(part.size).put(part)
+            return out.array()
+        } finally {
+            keyBytes.fill(0)
         }
-    }.toByteArray()
+    }
 
     private fun encodeCopies(): ByteArray = ByteArrayOutputStream().also { bytes ->
         DataOutputStream(bytes).use { out ->
@@ -128,7 +137,11 @@ class KeyBackup(
                 // GCM can't tell a wrong code from a damaged file
                 throw BackupFailure(BackupFailure.Reason.WrongCodeOrDamaged, "Wrong recovery code or damaged file.")
             }
-            return decodeContents(contents, version)
+            try {
+                return decodeContents(contents, version)
+            } finally {
+                contents.fill(0)
+            }
         }
 
         private fun decodeContents(contents: ByteArray, version: Byte): KeyBackup {
@@ -136,7 +149,11 @@ class KeyBackup(
                 List(if (version >= 2) 4 else 3) { ByteArray(input.readInt()).also(input::readFully) }
             }
             val (keyBytes, certBytes, lineageBytes) = parts
-            val key = KeyFactory.getInstance("RSA").generatePrivate(PKCS8EncodedKeySpec(keyBytes))
+            val key = try {
+                KeyFactory.getInstance("RSA").generatePrivate(PKCS8EncodedKeySpec(keyBytes))
+            } finally {
+                keyBytes.fill(0)
+            }
             val cert = CertificateFactory.getInstance("X.509").generateCertificate(certBytes.inputStream()) as X509Certificate
             val lineage = SigningCertificateLineage.readFromBytes(lineageBytes)
             if (!lineage.isCertificateLatestInLineage(cert)) throw BackupFailure(BackupFailure.Reason.Damaged, "The key doesn't match its lineage.")
@@ -172,11 +189,22 @@ class KeyBackup(
                 (if (copy.autoUpdate) AUTO_UPDATE else 0)
 
         private fun cipher(mode: Int, code: String, salt: ByteArray, nonce: ByteArray, header: ByteArray): Cipher {
-            val spec = PBEKeySpec(code.toCharArray(), salt, ITERATIONS, 256)
-            val secret = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").generateSecret(spec).encoded
-            return Cipher.getInstance("AES/GCM/NoPadding").apply {
-                init(mode, SecretKeySpec(secret, "AES"), GCMParameterSpec(128, nonce))
-                updateAAD(header)
+            val chars = code.toCharArray()
+            val spec = PBEKeySpec(chars, salt, ITERATIONS, 256)
+            val secret = try {
+                SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").generateSecret(spec).encoded
+            } finally {
+                spec.clearPassword()
+                chars.fill('\u0000')
+            }
+            try {
+                // SecretKeySpec keeps its own copy, so wiping ours doesn't break the cipher
+                return Cipher.getInstance("AES/GCM/NoPadding").apply {
+                    init(mode, SecretKeySpec(secret, "AES"), GCMParameterSpec(128, nonce))
+                    updateAAD(header)
+                }
+            } finally {
+                secret.fill(0)
             }
         }
 
