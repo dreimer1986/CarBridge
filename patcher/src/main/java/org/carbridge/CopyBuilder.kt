@@ -33,7 +33,10 @@ object CopyBuilder {
         val carPackage = PatchPipeline.carPackageName(app.packageName)
         if (!_building.compareAndSet(null, carPackage)) return false
         try {
-            val apks = PatchPipeline(context, log).patch(app, options(context, app.packageName))
+            val options = options(context, app.packageName)
+            // Saved per copy, so later changes to the defaults leave existing copies as they are
+            save(context, app.packageName, options)
+            val apks = PatchPipeline(context, log).patch(app, options)
             onPatched()
             if (!ShizukuMode.install(context, apks, carPackage, background, log)) {
                 Installer.install(context, apks, carPackage, background)
@@ -46,14 +49,49 @@ object CopyBuilder {
         return true
     }
 
-    /** The user's per-app choices; by default copies fill the screen and drop media services. */
+    /**
+     * The user's choices for one app. Unset choices come from [defaults] for a new copy, and from
+     * [CarOptions]' own defaults for a copy made before CarBridge had defaults, so it doesn't change.
+     */
     fun options(context: Context, originalPackage: String): CarOptions {
         val prefs = context.getSharedPreferences("setup", 0)
+        val carPackage = PatchPipeline.carPackageName(originalPackage)
+        val exists = runCatching { context.packageManager.getPackageInfo(carPackage, 0) }.isSuccess
+        val base = if (exists) CarOptions() else defaults(context)
+        fun choice(key: String, fallback: Boolean) =
+            if (prefs.contains("$key:$originalPackage")) prefs.getBoolean("$key:$originalPackage", fallback) else fallback
         return CarOptions(
-            keepMediaServices = prefs.getBoolean("keep_media:$originalPackage", false),
-            fillScreen = !prefs.getBoolean("keep_portrait:$originalPackage", false),
-            hideOnPhone = prefs.getBoolean("hide_on_phone:$originalPackage", false),
+            keepMediaServices = choice("keep_media", base.keepMediaServices),
+            fillScreen = !choice("keep_portrait", !base.fillScreen),
+            hideOnPhone = choice("hide_on_phone", base.hideOnPhone),
         )
+    }
+
+    fun save(context: Context, originalPackage: String, options: CarOptions) {
+        context.getSharedPreferences("setup", 0).edit()
+            .putBoolean("keep_media:$originalPackage", options.keepMediaServices)
+            .putBoolean("keep_portrait:$originalPackage", !options.fillScreen)
+            .putBoolean("hide_on_phone:$originalPackage", options.hideOnPhone)
+            .apply()
+    }
+
+    /** The choices new copies start with, set in Settings. */
+    fun defaults(context: Context): CarOptions {
+        val prefs = context.getSharedPreferences("setup", 0)
+        val built = CarOptions()
+        return CarOptions(
+            keepMediaServices = prefs.getBoolean("default_keep_media", built.keepMediaServices),
+            fillScreen = prefs.getBoolean("default_fill_screen", built.fillScreen),
+            hideOnPhone = prefs.getBoolean("default_hide_on_phone", built.hideOnPhone),
+        )
+    }
+
+    fun setDefaults(context: Context, options: CarOptions) {
+        context.getSharedPreferences("setup", 0).edit()
+            .putBoolean("default_keep_media", options.keepMediaServices)
+            .putBoolean("default_fill_screen", options.fillScreen)
+            .putBoolean("default_hide_on_phone", options.hideOnPhone)
+            .apply()
     }
 
     /** A build failure in words the user can act on. */

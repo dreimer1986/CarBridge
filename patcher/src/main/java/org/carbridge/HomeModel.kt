@@ -71,8 +71,8 @@ data class Setup(val canInstall: Boolean, val developerMode: Boolean, val unknow
     val complete get() = canInstall && developerMode && unknownSources
 }
 
-/** An add waiting for the user's layout and audio choices. */
-data class AddChoice(val app: SourceApp, val portraitLocked: Boolean, val hasMediaService: Boolean)
+/** An add waiting for the user's layout and audio choices, which start from [defaults]. */
+data class AddChoice(val app: SourceApp, val portraitLocked: Boolean, val hasMediaService: Boolean, val defaults: CarOptions)
 
 data class UserMessage(val text: String, val details: String? = null)
 
@@ -202,16 +202,12 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
             val (portrait, media) = withContext(Dispatchers.IO) {
                 AppCatalog.traits(getApplication(), app.info.packageName)
             }
-            if (portrait || media) pendingAdd = AddChoice(app, portrait, media) else add(app, update = false)
+            if (portrait || media) pendingAdd = AddChoice(app, portrait, media, defaults) else add(app, update = false)
         }
     }
 
     fun confirmAdd(choice: AddChoice, options: CarOptions) {
-        val pkg = choice.app.info.packageName
-        prefs.edit()
-            .putBoolean("keep_portrait:$pkg", !options.fillScreen)
-            .putBoolean("keep_media:$pkg", options.keepMediaServices)
-            .apply()
+        CopyBuilder.save(getApplication(), choice.app.info.packageName, options)
         pendingAdd = null
         add(choice.app, update = false)
     }
@@ -376,6 +372,15 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
         val original = copy.original ?: return
         AutoUpdate.setAllowed(getApplication(), original.info.packageName, allowed)
         refresh()
+    }
+
+    /** What new copies start with; existing copies keep their own choices. */
+    var defaults by mutableStateOf(CopyBuilder.defaults(app))
+        private set
+
+    fun changeDefaults(options: CarOptions) {
+        CopyBuilder.setDefaults(getApplication(), options)
+        defaults = options
     }
 
     fun toggleAutoApps() {

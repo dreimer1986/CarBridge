@@ -97,7 +97,8 @@ opened with or shared to CarBridge from a file manager or browser. With [Shizuku
 running, **Settings → Install with Shizuku** installs copies without any prompt, even the first
 time, and gives them the runtime permissions the original app has. Copies drop portrait locks so they fill the
 car screen; the ⋮ menu keeps the portrait layout per app. **Hide from phone's app list** in the
-⋮ menu keeps a copy out of the phone's launcher; it still shows in Android Auto. CarBridge warns before copying apps with
+⋮ menu keeps a copy out of the phone's launcher; it still shows in Android Auto. **Settings → For new
+copies** sets these choices for apps added from then on; existing copies keep theirs. CarBridge warns before copying apps with
 Google Play's copy protection (`com.pairip.licensecheck`), and points Morphe-patched apps to the
 [CarBridge Patches](https://github.com/jmwerk/carbridge-patches) source instead.
 

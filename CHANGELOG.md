@@ -14,6 +14,7 @@ What changed in each CarBridge release. Dev pre-releases show the Unreleased sec
 - Apps already on the car screen, e.g. copies made by AAAnything or Morphe, count as working in Android Auto
 - Hide a car copy from the phone's app list from its ⋮ menu; it still shows in Android Auto
 - The app's text can now be translated
+- Settings → For new copies: choose whether new copies fill the screen, use Android Auto's audio player or hide from the phone's app list
 
 ## [0.6.0] - 2026-11-17
 

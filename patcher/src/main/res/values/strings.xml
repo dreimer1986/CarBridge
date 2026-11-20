@@ -147,6 +147,11 @@
     <!-- Settings -->
     <string name="auto_update_title">Update copies automatically</string>
     <string name="auto_update_body">When an app updates, CarBridge updates its car copy the next time your phone charges.</string>
+    <string name="defaults_title">For new copies</string>
+    <string name="defaults_body">Choices for the apps you add from now on. Change a copy\'s own choices from its ⋮ menu.</string>
+    <string name="defaults_fill_body">Apps locked upright stretch to the wide car screen.</string>
+    <string name="defaults_player_body">Audio apps open in Android Auto\'s player instead of the full app.</string>
+    <string name="defaults_hide_body">Copies show only in Android Auto. Open them on the phone from CarBridge.</string>
     <string name="key_title">Your CarBridge key</string>
     <string name="key_backed_up">Backed up.</string>
     <string name="key_not_backed_up">Not backed up yet.</string>

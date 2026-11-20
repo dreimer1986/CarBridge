@@ -417,6 +417,8 @@ fun HomeScreen(model: HomeModel, actions: HomeActions) {
             Settings(
                 autoUpdate = model.autoUpdate,
                 onAutoUpdate = model::switchAutoUpdate,
+                defaults = model.defaults,
+                onDefaults = model::changeDefaults,
                 backedUp = model.backedUp,
                 onBackUp = { showSettings = false; model.startBackup() },
                 onRestore = { showSettings = false; actions.pickBackup() },
@@ -877,8 +879,8 @@ private fun UpdateAllRow(count: Int, enabled: Boolean, onClick: () -> Unit) {
 
 @Composable
 private fun AddChoiceDialog(choice: AddChoice, onConfirm: (CarOptions) -> Unit, onDismiss: () -> Unit) {
-    var fill by rememberSaveable { mutableStateOf(true) }
-    var player by rememberSaveable { mutableStateOf(false) }
+    var fill by rememberSaveable { mutableStateOf(choice.defaults.fillScreen) }
+    var player by rememberSaveable { mutableStateOf(choice.defaults.keepMediaServices) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.add_title, choice.app.label)) },
@@ -906,7 +908,7 @@ private fun AddChoiceDialog(choice: AddChoice, onConfirm: (CarOptions) -> Unit, 
             }
         },
         confirmButton = {
-            TextButton(onClick = { onConfirm(CarOptions(keepMediaServices = player, fillScreen = fill)) }) {
+            TextButton(onClick = { onConfirm(choice.defaults.copy(keepMediaServices = player, fillScreen = fill)) }) {
                 Text(stringResource(R.string.add_to_car))
             }
         },
@@ -1062,6 +1064,8 @@ private fun About() {
 private fun Settings(
     autoUpdate: Boolean,
     onAutoUpdate: (Boolean) -> Unit,
+    defaults: CarOptions,
+    onDefaults: (CarOptions) -> Unit,
     backedUp: Boolean,
     onBackUp: () -> Unit,
     onRestore: () -> Unit,
@@ -1077,15 +1081,18 @@ private fun Settings(
         verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
         Text(stringResource(R.string.settings), style = MaterialTheme.typography.headlineSmall)
-        Row(
-            Modifier.fillMaxWidth().toggleable(value = autoUpdate, role = Role.Switch, onValueChange = onAutoUpdate),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(Modifier.weight(1f)) {
-                AboutItem(stringResource(R.string.auto_update_title), stringResource(R.string.auto_update_body))
+        SettingSwitch(stringResource(R.string.auto_update_title), stringResource(R.string.auto_update_body), autoUpdate, onAutoUpdate)
+        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            AboutItem(stringResource(R.string.defaults_title), stringResource(R.string.defaults_body))
+            SettingSwitch(stringResource(R.string.choice_fill_title), stringResource(R.string.defaults_fill_body), defaults.fillScreen) {
+                onDefaults(defaults.copy(fillScreen = it))
             }
-            Spacer(Modifier.width(12.dp))
-            Switch(checked = autoUpdate, onCheckedChange = null)
+            SettingSwitch(stringResource(R.string.choice_player_title), stringResource(R.string.defaults_player_body), defaults.keepMediaServices) {
+                onDefaults(defaults.copy(keepMediaServices = it))
+            }
+            SettingSwitch(stringResource(R.string.menu_hide_on_phone), stringResource(R.string.defaults_hide_body), defaults.hideOnPhone) {
+                onDefaults(defaults.copy(hideOnPhone = it))
+            }
         }
         Column {
             AboutItem(
@@ -1103,20 +1110,25 @@ private fun Settings(
 }
 
 @Composable
+private fun SettingSwitch(title: String, body: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().toggleable(value = checked, role = Role.Switch, onValueChange = onChange),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) { AboutItem(title, body) }
+        Spacer(Modifier.width(12.dp))
+        Switch(checked = checked, onCheckedChange = null)
+    }
+}
+
+@Composable
 private fun ShizukuSetting(state: ShizukuMode.State, on: Boolean, onSwitch: (Boolean) -> Unit, onAllow: () -> Unit) {
     val context = LocalContext.current
     val uri = LocalUriHandler.current
     val title = stringResource(R.string.shizuku_title)
     val what = stringResource(R.string.shizuku_what)
     when (state) {
-        ShizukuMode.State.Ready -> Row(
-            Modifier.fillMaxWidth().toggleable(value = on, role = Role.Switch, onValueChange = onSwitch),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(Modifier.weight(1f)) { AboutItem(title, what) }
-            Spacer(Modifier.width(12.dp))
-            Switch(checked = on, onCheckedChange = null)
-        }
+        ShizukuMode.State.Ready -> SettingSwitch(title, what, on, onSwitch)
         else -> Column {
             AboutItem(
                 title,
