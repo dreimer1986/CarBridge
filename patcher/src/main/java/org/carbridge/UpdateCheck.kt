@@ -164,6 +164,6 @@ class AutoUpdateOptInReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         AutoUpdate.setEnabled(context, true)
         UpdateCheck.dismiss(context)
-        AutoUpdate.notifyResult(context, context.getString(R.string.auto_on_title), context.getString(R.string.auto_on_text))
+        AutoUpdate.notifyResult(context, "auto_update_on", context.getString(R.string.auto_on_title), context.getString(R.string.auto_on_text))
     }
 }

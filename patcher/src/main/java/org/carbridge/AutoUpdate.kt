@@ -29,6 +29,8 @@ object AutoUpdate {
     private const val JOB_ID = 2
     private const val CHANNEL = "copy_auto_updates"
     private const val GROUP = "org.carbridge.AUTO_UPDATES"
+    // One id for every notice; the tag tells them apart without hash collisions
+    private const val NOTIFICATION_ID = 3
 
     /** After this long without charging, the user gets the manual update notice instead. */
     val MAX_WAIT_MS = TimeUnit.DAYS.toMillis(2)
@@ -97,7 +99,7 @@ object AutoUpdate {
             if (!CopyBuilder.build(context, app, log = { Log.i(TAG, it) }, background = true)) return true
         } catch (e: Throwable) {
             Log.e(TAG, "background update failed", e)
-            notifyResult(context, next.label, context.getString(R.string.auto_failed), CopyBuilder.describe(e))
+            notifyResult(context, next.originalPackage, next.label, context.getString(R.string.auto_failed), CopyBuilder.describe(e))
         }
         return pending(context, UpdateCheck.findOutdated(context)).isNotEmpty()
     }
@@ -112,8 +114,11 @@ object AutoUpdate {
         return true
     }
 
-    /** A quiet notice about one copy; [details] go in the expanded text. */
-    fun notifyResult(context: Context, label: String, text: String, details: String? = null, action: PendingIntent? = null) {
+    /**
+     * A quiet notice about one copy; [details] go in the expanded text. Notices with the same [key],
+     * the original's package, replace each other.
+     */
+    fun notifyResult(context: Context, key: String, label: String, text: String, details: String? = null, action: PendingIntent? = null) {
         if (context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
         val manager = context.getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(
@@ -136,7 +141,7 @@ object AutoUpdate {
             .setAutoCancel(true)
             .setGroup(GROUP)
             .build()
-        manager.notify(label.hashCode(), notification)
+        manager.notify(key, NOTIFICATION_ID, notification)
     }
 
     /** The label users know a copy by: its original's. */
@@ -160,5 +165,13 @@ class AutoUpdateService : JobService() {
     }
 
     // A stopped build finishes or dies with the process; the next run picks up what's left
-    override fun onStopJob(params: JobParameters) = true
+    override fun onStopJob(params: JobParameters): Boolean {
+        val building = CopyBuilder.building.value
+        // Android allows background jobs about ten minutes; very large apps may need longer
+        if (params.stopReason == JobParameters.STOP_REASON_TIMEOUT && building != null) {
+            val original = PatchPipeline.originalPackageName(building)
+            AutoUpdate.notifyResult(this, original, AutoUpdate.labelOf(this, building), getString(R.string.auto_too_long))
+        }
+        return true
+    }
 }

@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageInstaller
 import java.io.File
+import org.carbridge.patch.PatchPipeline
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 
@@ -108,6 +109,7 @@ class InstallStatusReceiver : BroadcastReceiver() {
     /** Background updates can't open screens, so their outcome, or the prompt, is a notification. */
     private fun reportInBackground(context: Context, intent: Intent, status: Int, pkg: String) {
         val label = AutoUpdate.labelOf(context, pkg)
+        val original = PatchPipeline.originalPackageName(pkg)
         when (status) {
             PackageInstaller.STATUS_PENDING_USER_ACTION -> {
                 @Suppress("DEPRECATION")
@@ -115,17 +117,17 @@ class InstallStatusReceiver : BroadcastReceiver() {
                 val tap = PendingIntent.getActivity(
                     context, pkg.hashCode(), confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), PendingIntent.FLAG_IMMUTABLE,
                 )
-                AutoUpdate.notifyResult(context, label, context.getString(R.string.auto_confirm), action = tap)
+                AutoUpdate.notifyResult(context, original, label, context.getString(R.string.auto_confirm), action = tap)
             }
             PackageInstaller.STATUS_SUCCESS -> {
                 val version = runCatching { context.packageManager.getPackageInfo(pkg, 0).versionName }.getOrNull()
                 AutoUpdate.notifyResult(
-                    context, label,
+                    context, original, label,
                     if (version != null) context.getString(R.string.auto_updated_to, version) else context.getString(R.string.auto_updated),
                 )
             }
             else -> AutoUpdate.notifyResult(
-                context, label, context.getString(R.string.auto_failed),
+                context, original, label, context.getString(R.string.auto_failed),
                 Installer.describeFailure(status, intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE)),
             )
         }

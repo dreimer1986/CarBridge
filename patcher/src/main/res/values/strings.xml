@@ -242,6 +242,7 @@
     <string name="channel_auto">Automatic copy updates</string>
     <string name="channel_auto_desc">Car copies CarBridge updated on its own, or needs you to finish updating</string>
     <string name="auto_failed">Couldn\'t update its car copy. Open CarBridge to try again.</string>
+    <string name="auto_too_long">Its car copy took too long to update in the background. Open CarBridge to update it.</string>
     <string name="auto_confirm">Android needs you to confirm its car copy update. Tap to finish.</string>
     <string name="auto_updated_to">Car copy updated to %s.</string>
     <string name="auto_updated">Car copy updated.</string>
