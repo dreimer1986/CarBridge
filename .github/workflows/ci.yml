@@ -40,3 +40,33 @@ jobs:
                       com.google.android.gms.car.application; do
             grep -q "$want" manifest.txt || { echo "Missing from manifest: $want"; exit 1; }
           done
+
+  # carbridge-patches compiles core/ too; catch rule changes that break it before a release
+  patches-bundle:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Morphe's Gradle plugin comes from GitHub Packages
+      packages: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: jmwerk/carbridge-patches
+          ref: dev
+          path: carbridge-patches
+
+      # Stands in for the bundle's carbridge submodule
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: carbridge-patches/carbridge
+
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Test and build the patches bundle
+        working-directory: carbridge-patches
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./gradlew --no-daemon :patches:test :patches:buildAndroid
