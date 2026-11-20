@@ -1,5 +1,6 @@
 package org.carbridge.ui
 
+import android.text.format.Formatter
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,6 +37,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -88,7 +90,10 @@ internal fun CarSign(
                                 copy.carProblem != null -> stringResource(R.string.car_problem_subtitle, stringResource(copy.carProblem.text))
                                 copy.outdated -> "${versionText(copy.version!!, copy.originalVersion!!)} → " +
                                     versionText(copy.originalVersion, copy.version)
-                                else -> copy.version?.name?.let(::shortVersion) ?: stringResource(R.string.copy_in_android_auto)
+                                else -> listOfNotNull(
+                                    copy.version?.name?.let(::shortVersion) ?: stringResource(R.string.copy_in_android_auto),
+                                    copy.sizeBytes.takeIf { it > 0 }?.let { Formatter.formatShortFileSize(LocalContext.current, it) },
+                                ).joinToString(" · ")
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = signs.onGuideMuted,

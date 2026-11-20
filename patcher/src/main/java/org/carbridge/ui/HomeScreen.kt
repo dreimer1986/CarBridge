@@ -1,6 +1,7 @@
 package org.carbridge.ui
 
 import android.app.Activity
+import android.text.format.Formatter
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
@@ -64,6 +65,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.pluralStringResource
@@ -252,6 +254,18 @@ fun HomeScreen(model: HomeModel, actions: HomeActions) {
                 }
 
                 item("car-title") { SectionTitle(stringResource(R.string.on_your_car)) }
+                val copyBytes = catalog?.copies.orEmpty().sumOf { it.sizeBytes }
+                if (copyBytes > 0) {
+                    item("car-storage") {
+                        val count = catalog!!.copies.size
+                        Text(
+                            pluralStringResource(R.plurals.copies_storage, count, count, Formatter.formatShortFileSize(LocalContext.current, copyBytes)),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(start = Gutter, end = Gutter, bottom = 8.dp),
+                        )
+                    }
+                }
                 when {
                     catalog == null -> item("loading") { Loading() }
                     catalog.copies.isEmpty() -> item("car-empty") {

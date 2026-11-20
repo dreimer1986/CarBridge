@@ -61,6 +61,8 @@ data class CarCopy(
     val autoUpdateAllowed: Boolean = true,
     /** Why Android Auto won't list this copy, or null when it has what Android Auto needs. */
     val carProblem: CarProblem? = null,
+    /** The copy's installed APKs; its data isn't readable without usage-access permission. */
+    val sizeBytes: Long = 0,
 ) {
     /** A key backup could make this copy updatable again. */
     val needsRestore get() = signedElsewhere && !madeByOtherCarBridge
@@ -135,6 +137,7 @@ object AppCatalog {
                 madeByOtherCarBridge = installer(pm, info.packageName).let { by ->
                     by != null && by != context.packageName && (by == CARBRIDGE_ID || by.startsWith("$CARBRIDGE_ID.")) && isInstalled(pm, by)
                 },
+                sizeBytes = info.apkBytes(),
             )
         }.sortedWith(compareBy({ !it.outdated }, { it.label.lowercase() }))
 
@@ -194,11 +197,13 @@ object AppCatalog {
             info.activities.orEmpty().any { it.name.startsWith(PAIRIP_PREFIX) }
     }.getOrDefault(false)
 
+    private fun ApplicationInfo.apkBytes() = (listOf(sourceDir) + splitSourceDirs.orEmpty()).sumOf { File(it).length() }
+
     private fun ApplicationInfo.toSource(pm: PackageManager, icon: ImageBitmap, hasAndroidAuto: Boolean, caution: Caution?) = SourceApp(
         label = loadLabel(pm).toString(),
         info = this,
         icon = icon,
-        sizeBytes = (listOf(sourceDir) + splitSourceDirs.orEmpty()).sumOf { File(it).length() },
+        sizeBytes = apkBytes(),
         hasAndroidAuto = hasAndroidAuto,
         caution = caution,
     )
