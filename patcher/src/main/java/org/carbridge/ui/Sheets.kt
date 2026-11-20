@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -97,12 +98,13 @@ internal fun Settings(
                 // The one warning here that can cost copies, so it gets the caution sign, not body text
                 BackupCallout(missing ?: stringResource(R.string.key_not_backed_up), stringResource(if (backedUp) R.string.back_up_again else R.string.back_up_key), onBackUp)
             } else {
-                Text(stringResource(R.string.key_backed_up), style = MaterialTheme.typography.titleMedium)
-            }
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (backedUp && missing == null) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(R.string.key_backed_up), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
                     FilledTonalButton(onClick = onBackUp) { Text(stringResource(R.string.back_up_again)) }
                 }
+            }
+            // Pulled left so the button labels line up with the text above
+            FlowRow(Modifier.offset(x = (-12).dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 TextButton(onClick = onRestore) { Text(stringResource(R.string.restore_backup)) }
                 TextButton(onClick = onCheck) { Text(stringResource(R.string.check_backup)) }
             }
