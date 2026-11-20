@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Settings
@@ -39,6 +40,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import org.carbridge.R
 
 internal val SignShape = RoundedCornerShape(20.dp)
@@ -75,6 +77,9 @@ internal fun SignHeader(onSettings: () -> Unit, onAbout: () -> Unit) {
                 stringResource(R.string.app_name),
                 style = MaterialTheme.typography.displaySmall,
                 color = signs.onGuide,
+                // One line even for "CarBridge Dev" or a long translation; shrink rather than wrap
+                maxLines = 1,
+                autoSize = TextAutoSize.StepBased(minFontSize = 22.sp, maxFontSize = MaterialTheme.typography.displaySmall.fontSize),
                 modifier = Modifier.weight(1f).semantics { heading() },
             )
             IconButton(onClick = onSettings) {

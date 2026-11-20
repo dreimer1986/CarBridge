@@ -25,6 +25,8 @@ What changed in each CarBridge release. Dev pre-releases show the Unreleased sec
 - The ⋮ menu marks each copy's choices with a checkmark and has its own icon for each
 - Tap anywhere on an app in the list to add it; long names wrap instead of being cut off
 - Settings has clearer sections, and a yellow notice when your key backup is missing copies
+- The app name fits on one line, and no green strip stays at the top once you scroll past it
+- Text is easier to read, with tighter letter spacing
 
 ## [0.6.0] - 2026-11-17
 

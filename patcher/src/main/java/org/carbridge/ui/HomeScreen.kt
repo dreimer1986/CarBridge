@@ -1,11 +1,14 @@
 package org.carbridge.ui
 
+import android.app.Activity
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -56,9 +59,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowCompat
 import kotlinx.coroutines.launch
 import org.carbridge.CarCopy
 import org.carbridge.HomeModel
@@ -315,11 +320,14 @@ fun HomeScreen(model: HomeModel, actions: HomeActions) {
                 }
             }
 
-            // Keeps light status bar icons readable once the header scrolls away
-            Box(
-                Modifier.fillMaxWidth().windowInsetsTopHeight(WindowInsets.statusBars)
-                    .background(LocalSigns.current.guide),
+            // Green behind the header, then the page color, so no green strip floats over the list
+            val headerGone by remember { derivedStateOf { listState.firstVisibleItemIndex > 0 } }
+            val scrim by animateColorAsState(
+                if (headerGone) MaterialTheme.colorScheme.background else LocalSigns.current.guide,
+                label = "statusScrim",
             )
+            StatusBarIcons(dark = headerGone && !isSystemInDarkTheme())
+            Box(Modifier.fillMaxWidth().windowInsetsTopHeight(WindowInsets.statusBars).background(scrim))
         }
     }
 
@@ -393,6 +401,17 @@ fun HomeScreen(model: HomeModel, actions: HomeActions) {
                 }
             },
         )
+    }
+}
+
+/** Dark status bar icons over a light page; light ones over the green header or a dark page. */
+@Composable
+private fun StatusBarIcons(dark: Boolean) {
+    val view = LocalView.current
+    if (view.isInEditMode) return
+    LaunchedEffect(dark) {
+        val window = (view.context as? Activity)?.window ?: return@LaunchedEffect
+        WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = dark
     }
 }
 

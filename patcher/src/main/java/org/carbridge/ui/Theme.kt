@@ -15,6 +15,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.googlefonts.Font
 import androidx.compose.ui.text.googlefonts.GoogleFont
+import androidx.compose.ui.unit.sp
 import org.carbridge.R
 
 /** Road-sign fields that keep their meaning in both themes, like real signs at night. */
@@ -119,9 +120,10 @@ private val CarBridgeType = Typography().run {
         titleLarge = titleLarge.overpass(FontWeight.Bold),
         titleMedium = titleMedium.overpass(FontWeight.Bold),
         titleSmall = titleSmall.overpass(FontWeight.SemiBold),
-        bodyLarge = bodyLarge.overpass(),
-        bodyMedium = bodyMedium.overpass(),
-        bodySmall = bodySmall.overpass(),
+        // Overpass is already wide; Material's body tracking makes paragraphs look spaced out
+        bodyLarge = bodyLarge.overpass().copy(letterSpacing = 0.sp),
+        bodyMedium = bodyMedium.overpass().copy(letterSpacing = 0.sp),
+        bodySmall = bodySmall.overpass().copy(letterSpacing = 0.sp),
         labelLarge = labelLarge.overpass(FontWeight.Bold),
         labelMedium = labelMedium.overpass(FontWeight.Bold),
         labelSmall = labelSmall.overpass(FontWeight.Bold),
