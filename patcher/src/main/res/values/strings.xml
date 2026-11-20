@@ -37,7 +37,7 @@
         <item quantity="one">Your copy takes up %2$s, plus its own data.</item>
         <item quantity="other">Your %1$d copies take up %2$s, plus their own data.</item>
     </plurals>
-    <string name="car_empty">Nothing yet. Add an app below, then reconnect your phone to Android Auto.</string>
+    <string name="car_empty">Nothing yet. Add an app below to see it in Android Auto.</string>
     <string name="add_an_app">Add an app</string>
     <string name="add_from_file">Add from an APK file</string>
     <string name="select_several">Select several</string>
