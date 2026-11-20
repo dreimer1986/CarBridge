@@ -12,6 +12,7 @@ import androidx.annotation.StringRes
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 import org.carbridge.core.CarOptions
 import org.carbridge.core.CarPatch
 import org.carbridge.patch.KeystoreSigner
@@ -102,21 +103,14 @@ object AppCatalog {
             .filter { it.metaData?.containsKey(CAR_APP_META) == true }
             .map { it.packageName }
             .toSet() + carLaunchable(pm)
-        // CHECK_LICENSE alone is too common (ad SDKs, free apps) to predict a failure
-        val licensed = pm.getInstalledPackages(PackageManager.GET_PROVIDERS or PackageManager.GET_ACTIVITIES)
-            .filter { pkg ->
-                pkg.providers.orEmpty().any { it.name.startsWith(PAIRIP_PREFIX) } ||
-                    pkg.activities.orEmpty().any { it.name.startsWith(PAIRIP_PREFIX) }
-            }
-            .map { it.packageName }
-            .toSet()
         val sources = sourceInfos.associate { info ->
+            val scan = scan(pm, info)
             val caution = when {
                 info.packageName.startsWith(MORPHE_PREFIX) -> Caution.Morphe
-                info.packageName in licensed -> Caution.LicenseCheck
+                scan.licensed -> Caution.LicenseCheck
                 else -> null
             }
-            info.packageName to info.toSource(pm, info.packageName in autoApps, caution)
+            info.packageName to info.toSource(pm, scan.icon, info.packageName in autoApps, caution)
         }
 
         val signer = KeystoreSigner(context)
@@ -127,7 +121,7 @@ object AppCatalog {
                 // The sign already says it is on the car
                 label = info.loadLabel(pm).toString().removeSuffix(PatchPipeline.CAR_LABEL_SUFFIX),
                 packageName = info.packageName,
-                icon = pm.getApplicationIcon(info).toImageBitmap(),
+                icon = scan(pm, info).icon,
                 original = original,
                 version = versionOf(pm, info.packageName),
                 originalVersion = original?.let { versionOf(pm, originalPkg) },
@@ -180,10 +174,30 @@ object AppCatalog {
     private fun isUserFacing(info: ApplicationInfo): Boolean =
         info.flags and ApplicationInfo.FLAG_SYSTEM == 0 || info.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP != 0
 
-    private fun ApplicationInfo.toSource(pm: PackageManager, hasAndroidAuto: Boolean, caution: Caution?) = SourceApp(
+    /** What only changes when a package does; [updated] is its lastUpdateTime, or -1 if unknown. */
+    private class Scan(val updated: Long, val icon: ImageBitmap, val licensed: Boolean)
+
+    // Every refresh reuses these, so only new or updated apps cost an icon draw and a component scan
+    private val scans = ConcurrentHashMap<String, Scan>()
+
+    private fun scan(pm: PackageManager, info: ApplicationInfo): Scan {
+        val pkg = info.packageName
+        val updated = runCatching { pm.getPackageInfo(pkg, 0).lastUpdateTime }.getOrDefault(-1L)
+        scans[pkg]?.takeIf { updated != -1L && it.updated == updated }?.let { return it }
+        return Scan(updated, pm.getApplicationIcon(info).toImageBitmap(), usesPlayLicense(pm, pkg)).also { scans[pkg] = it }
+    }
+
+    // CHECK_LICENSE alone is too common (ad SDKs, free apps) to predict a failure
+    private fun usesPlayLicense(pm: PackageManager, pkg: String): Boolean = runCatching {
+        val info = pm.getPackageInfo(pkg, PackageManager.GET_PROVIDERS or PackageManager.GET_ACTIVITIES)
+        info.providers.orEmpty().any { it.name.startsWith(PAIRIP_PREFIX) } ||
+            info.activities.orEmpty().any { it.name.startsWith(PAIRIP_PREFIX) }
+    }.getOrDefault(false)
+
+    private fun ApplicationInfo.toSource(pm: PackageManager, icon: ImageBitmap, hasAndroidAuto: Boolean, caution: Caution?) = SourceApp(
         label = loadLabel(pm).toString(),
         info = this,
-        icon = pm.getApplicationIcon(this).toImageBitmap(),
+        icon = icon,
         sizeBytes = (listOf(sourceDir) + splitSourceDirs.orEmpty()).sumOf { File(it).length() },
         hasAndroidAuto = hasAndroidAuto,
         caution = caution,

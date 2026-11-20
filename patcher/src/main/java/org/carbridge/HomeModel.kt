@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.net.Uri
+import android.os.SystemClock
 import android.os.storage.StorageManager
 import android.util.Log
 import androidx.annotation.StringRes
@@ -280,7 +281,10 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
         shizuku = ShizukuMode.state(getApplication())
         viewModelScope.launch {
             val (loaded, backed) = withContext(Dispatchers.IO) {
-                AppCatalog.load(getApplication(), ::carOptions) to KeystoreSigner(getApplication()).hasBackup()
+                val start = SystemClock.elapsedRealtime()
+                val loaded = AppCatalog.load(getApplication(), ::carOptions)
+                Log.i(TAG, "Catalog: ${loaded.copies.size + loaded.available.size} apps in ${SystemClock.elapsedRealtime() - start} ms")
+                loaded to KeystoreSigner(getApplication()).hasBackup()
             }
             catalog = loaded
             backedUp = backed
