@@ -79,8 +79,8 @@ data class UserMessage(val text: String, val details: String? = null)
 /** A key backup made but not yet saved; [code] is shown once and never stored. */
 class NewBackup(val file: ByteArray, val code: String)
 
-/** A backup file the user picked, waiting for its recovery code. */
-class RestoreRequest(val file: ByteArray, val error: String? = null, val working: Boolean = false)
+/** A backup file the user picked, waiting for its recovery code; [checkOnly] tests it without restoring. */
+class RestoreRequest(val file: ByteArray, val checkOnly: Boolean = false, val error: String? = null, val working: Boolean = false)
 
 class HomeModel(app: Application) : AndroidViewModel(app) {
     private val prefs = app.getSharedPreferences("setup", 0)
@@ -307,19 +307,28 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Whether the next picked backup file is only checked; set just before the picker opens. */
+    private var checkNextBackup = false
+
+    fun expectBackup(checkOnly: Boolean) {
+        checkNextBackup = checkOnly
+    }
+
     fun openRestore(uri: Uri) {
         val context = getApplication<Application>()
+        val checkOnly = checkNextBackup
         viewModelScope.launch {
             val file = withContext(Dispatchers.IO) {
                 runCatching { context.contentResolver.openInputStream(uri)!!.use { it.readBytes() } }
             }
-            file.onSuccess { restoreRequest = RestoreRequest(it) }
+            file.onSuccess { restoreRequest = RestoreRequest(it, checkOnly) }
                 .onFailure { _messages.send(UserMessage(text(R.string.msg_open_failed), it.message)) }
         }
     }
 
     fun restore(code: String) {
         val request = restoreRequest ?: return
+        if (request.checkOnly) return check(request, code)
         restoreRequest = RestoreRequest(request.file, working = true)
         val context = getApplication<Application>()
         viewModelScope.launch {
@@ -348,6 +357,24 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
                     },
                 ),
             )
+        }
+    }
+
+    private fun check(request: RestoreRequest, code: String) {
+        restoreRequest = RestoreRequest(request.file, checkOnly = true, working = true)
+        val context = getApplication<Application>()
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.Default) { runCatching { KeystoreSigner(context).check(request.file, code) } }
+            result.exceptionOrNull()?.let { e ->
+                Log.w(TAG, "backup check failed", e)
+                val reason = (e as? BackupFailure)?.reason?.text ?: R.string.backup_restore_failed
+                restoreRequest = RestoreRequest(request.file, checkOnly = true, error = text(reason))
+                return@launch
+            }
+            restoreRequest = null
+            val works = result.getOrThrow()
+            if (works) backedUp = true
+            _messages.send(UserMessage(text(if (works) R.string.msg_check_ok else R.string.msg_check_other)))
         }
     }
 

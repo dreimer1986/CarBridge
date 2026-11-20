@@ -155,6 +155,8 @@ class HomeActions(
     /** Opens Android's file picker to save the key backup under the given name. */
     val saveBackup: (String) -> Unit = {},
     val pickBackup: () -> Unit = {},
+    /** Opens the file picker for a backup to test with its code, without restoring it. */
+    val checkBackup: () -> Unit = {},
     /** Opens the file picker for APKs; with a copy, the files must be a newer version of its app. */
     val pickApks: (CarCopy?) -> Unit = {},
 )
@@ -422,6 +424,7 @@ fun HomeScreen(model: HomeModel, actions: HomeActions) {
                 backedUp = model.backedUp,
                 onBackUp = { showSettings = false; model.startBackup() },
                 onRestore = { showSettings = false; actions.pickBackup() },
+                onCheck = { showSettings = false; actions.checkBackup() },
                 shizuku = model.shizuku,
                 useShizuku = model.useShizuku,
                 onUseShizuku = model::switchShizuku,
@@ -1069,6 +1072,7 @@ private fun Settings(
     backedUp: Boolean,
     onBackUp: () -> Unit,
     onRestore: () -> Unit,
+    onCheck: () -> Unit,
     shizuku: ShizukuMode.State,
     useShizuku: Boolean,
     onUseShizuku: (Boolean) -> Unit,
@@ -1103,6 +1107,7 @@ private fun Settings(
             FlowRow(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilledTonalButton(onClick = onBackUp) { Text(stringResource(if (backedUp) R.string.back_up_again else R.string.back_up_key)) }
                 OutlinedButton(onClick = onRestore) { Text(stringResource(R.string.restore_backup)) }
+                OutlinedButton(onClick = onCheck) { Text(stringResource(R.string.check_backup)) }
             }
         }
         ShizukuSetting(shizuku, useShizuku, onUseShizuku, onAllowShizuku)
@@ -1244,7 +1249,7 @@ private fun RestoreDialog(request: RestoreRequest, onRestore: (String) -> Unit, 
     var code by rememberSaveable { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.restore_title)) },
+        title = { Text(stringResource(if (request.checkOnly) R.string.check_title else R.string.restore_title)) },
         text = {
             Column {
                 Text(stringResource(R.string.restore_prompt), style = MaterialTheme.typography.bodyMedium)
@@ -1277,7 +1282,9 @@ private fun RestoreDialog(request: RestoreRequest, onRestore: (String) -> Unit, 
             if (request.working) {
                 CircularProgressIndicator(Modifier.size(24.dp))
             } else {
-                TextButton(onClick = { onRestore(code) }, enabled = KeyBackup.isWellFormed(code)) { Text(stringResource(R.string.restore)) }
+                TextButton(onClick = { onRestore(code) }, enabled = KeyBackup.isWellFormed(code)) {
+                    Text(stringResource(if (request.checkOnly) R.string.check else R.string.restore))
+                }
             }
         },
         dismissButton = { TextButton(onClick = onDismiss, enabled = !request.working) { Text(stringResource(R.string.cancel)) } },

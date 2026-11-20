@@ -59,6 +59,22 @@ class KeyBackupTest {
     }
 
     @Test
+    fun coversEveryKeyInItsLineage() {
+        val a = keyPair()
+        val b = keyPair()
+        val certA = SelfSignedCertificate.create(a, "A", years = 1)
+        val certB = SelfSignedCertificate.create(b, "B", years = 1)
+        val lineage = SigningCertificateLineage.Builder(
+            SigningCertificateLineage.SignerConfig.Builder(a.private, certA).build(),
+            SigningCertificateLineage.SignerConfig.Builder(b.private, certB).build(),
+        ).setMinSdkVersion(28).build()
+        val backup = KeyBackup(b.private, certB, lineage)
+        assertTrue(backup.covers(certA))
+        assertTrue(backup.covers(certB))
+        assertFalse(backup.covers(SelfSignedCertificate.create(keyPair(), "C", years = 1)))
+    }
+
+    @Test
     fun rejectsOtherFiles() {
         val failure = assertThrows(BackupFailure::class.java) { KeyBackup.open("hello".toByteArray(), KeyBackup.newRecoveryCode()) }
         assertEquals(BackupFailure.Reason.NotABackup, failure.reason)

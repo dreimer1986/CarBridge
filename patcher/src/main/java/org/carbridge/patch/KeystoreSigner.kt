@@ -105,6 +105,18 @@ class KeystoreSigner(context: Context) {
         return backup
     }
 
+    /**
+     * Opens [file] without importing it. True when it can restore the key new copies are signed
+     * with; then that key counts as backed up, since the user has just shown the file works.
+     */
+    fun check(file: ByteArray, code: String): Boolean {
+        val backup = KeyBackup.open(file, code)
+        val active = active(create = false) ?: return false
+        if (!backup.covers(active.cert)) return false
+        backedUp.writeText(active.fingerprint)
+        return true
+    }
+
     /** The current signer of installed [pkg]; null when it isn't installed or can't be read. */
     private fun currentSigner(pm: PackageManager, pkg: String): ByteArray? = runCatching {
         pm.getPackageInfo(pkg, PackageManager.GET_SIGNING_CERTIFICATES).signingInfo?.apkContentsSigners?.firstOrNull()?.toByteArray()

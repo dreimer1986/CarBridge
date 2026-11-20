@@ -36,6 +36,9 @@ class BackupFailure(val reason: Reason, message: String) : Exception(message) {
  */
 class KeyBackup(val key: PrivateKey, val cert: X509Certificate, val lineage: SigningCertificateLineage) {
 
+    /** True when restoring this backup lets CarBridge update copies signed with [signer]. */
+    fun covers(signer: X509Certificate): Boolean = lineage.certificatesInLineage.any { it.encoded.contentEquals(signer.encoded) }
+
     fun seal(code: String): ByteArray {
         val salt = random(SALT_BYTES)
         val nonce = random(NONCE_BYTES)

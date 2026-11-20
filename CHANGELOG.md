@@ -15,6 +15,7 @@ What changed in each CarBridge release. Dev pre-releases show the Unreleased sec
 - Hide a car copy from the phone's app list from its ⋮ menu; it still shows in Android Auto
 - The app's text can now be translated
 - Settings → For new copies: choose whether new copies fill the screen, use Android Auto's audio player or hide from the phone's app list
+- Settings → Check a backup: test a key backup and its code without restoring it
 
 ## [0.6.0] - 2026-11-17
 

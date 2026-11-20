@@ -203,6 +203,8 @@ copies are v3 only, since v1 and v2 would need the lost key; copies only install
 - Android checks updates against a copy's current signer, and won't roll back: once a copy is
   signed with the backup key, only that key updates it. `KeystoreSigner.choose` picks per copy.
 - The same file keeps working after a second loss, since it holds the key now in use.
+- **Check a backup** (Settings) opens a file with its code without importing it, and says whether
+  it can restore the key CarBridge signs with now; a file that can counts as the current backup.
 - Anyone with the file and code can sign updates to the user's copies, so the UI says to keep
   both off the phone.
 - Copies installed by another CarBridge build still on the phone (CarBridge Dev) aren't flagged

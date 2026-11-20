@@ -57,7 +57,8 @@ class MainActivity : ComponentActivity() {
             open = ::openCopy,
             saveBackup = saveBackup::launch,
             // Files apps rarely know the .cbkey type, so show every file
-            pickBackup = { pickBackup.launch(arrayOf("*/*")) },
+            pickBackup = { model.expectBackup(checkOnly = false); pickBackup.launch(arrayOf("*/*")) },
+            checkBackup = { model.expectBackup(checkOnly = true); pickBackup.launch(arrayOf("*/*")) },
             // Bundles (.apks, .xapk) have no registered type, so show every file and check the contents
             pickApks = { copy -> model.expectFilesFor(copy); pickApks.launch(arrayOf("*/*")) },
         )

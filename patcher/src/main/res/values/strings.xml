@@ -178,6 +178,11 @@
     <string name="restore_title">Restore your key</string>
     <string name="restore_prompt">Enter the recovery code you saved with this backup.</string>
     <string name="restore">Restore</string>
+    <string name="check_backup">Check a backup</string>
+    <string name="check_title">Check a backup</string>
+    <string name="check">Check</string>
+    <string name="msg_check_ok">This backup works. It can restore the key your copies are signed with.</string>
+    <string name="msg_check_other">This backup opens, but it\'s for a different key than the one CarBridge signs with now. Make a new backup in Settings.</string>
     <string name="backup_not_backup">This isn\'t a CarBridge key backup.</string>
     <string name="backup_newer">This backup was made by a newer CarBridge. Update CarBridge, then try again.</string>
     <string name="backup_code_format">A recovery code has 24 letters and digits.</string>
