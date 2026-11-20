@@ -16,6 +16,12 @@ android {
         versionName = "0.7.0"
     }
 
+    // Leave out the Google-encrypted dependency block, which only Google can read
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
+    }
+
     buildFeatures {
         compose = true
         aidl = true
