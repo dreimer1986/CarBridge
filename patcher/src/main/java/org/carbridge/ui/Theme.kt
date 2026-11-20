@@ -10,11 +10,12 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.googlefonts.Font
-import androidx.compose.ui.text.googlefonts.GoogleFont
 import androidx.compose.ui.unit.sp
 import org.carbridge.R
 
@@ -95,19 +96,14 @@ private val DarkScheme = darkColorScheme(
     outlineVariant = Color(0xFF404943),
 )
 
-private val fontProvider = GoogleFont.Provider(
-    providerAuthority = "com.google.android.gms.fonts",
-    providerPackage = "com.google.android.gms",
-    certificates = R.array.com_google_android_gms_fonts_certs,
+// Overpass descends from Highway Gothic, the lettering on US guide signs. Bundled, not downloaded,
+// so it needs neither Play Services nor a network request.
+@OptIn(ExperimentalTextApi::class)
+private val Overpass = FontFamily(
+    listOf(FontWeight.Normal, FontWeight.Medium, FontWeight.SemiBold, FontWeight.Bold, FontWeight.ExtraBold).map {
+        Font(R.font.overpass, weight = it, variationSettings = FontVariation.Settings(FontVariation.weight(it.weight)))
+    },
 )
-
-// Overpass descends from Highway Gothic, the lettering on US guide signs
-private val Overpass = GoogleFont("Overpass").let { font ->
-    FontFamily(
-        listOf(FontWeight.Normal, FontWeight.Medium, FontWeight.SemiBold, FontWeight.Bold, FontWeight.ExtraBold)
-            .map { Font(googleFont = font, fontProvider = fontProvider, weight = it) },
-    )
-}
 
 private fun TextStyle.overpass(weight: FontWeight? = null) =
     copy(fontFamily = Overpass, fontWeight = weight ?: fontWeight)

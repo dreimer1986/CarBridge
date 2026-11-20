@@ -273,7 +273,6 @@ private fun BridgeCrossing(icon: ImageBitmap, progress: Float, stage: Crossing, 
                 with(cargo) { draw(Size(icon, icon)) }
             }
         }
-        // Measured here, not remembered, so it picks up Overpass once the downloadable font arrives
         if (honking) drawBeep(measurer.measure(beepText, beepStyle), hit.rect, honk.value, signs.caution)
     }
 }
