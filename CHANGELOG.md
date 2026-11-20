@@ -4,6 +4,7 @@ What changed in each CarBridge release. Dev pre-releases show the Unreleased sec
 
 ## [Unreleased]
 
+- Tapping the app search scrolls it to the top of the screen, so the results aren't hidden behind the keyboard
 - Landscape: the app list stays clear of the navigation bar and camera, and the A–Z strip fits
 
 ## [0.7.0] - 2026-11-20

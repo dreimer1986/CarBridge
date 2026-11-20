@@ -31,6 +31,7 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -45,7 +46,7 @@ import org.carbridge.R
 import org.carbridge.SourceApp
 
 @Composable
-internal fun SearchField(query: String, onChange: (String) -> Unit) {
+internal fun SearchField(query: String, onChange: (String) -> Unit, onFocus: (Boolean) -> Unit = {}) {
     TextField(
         value = query,
         onValueChange = onChange,
@@ -63,7 +64,7 @@ internal fun SearchField(query: String, onChange: (String) -> Unit) {
             unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
             focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
         ),
-        modifier = Modifier.fillMaxWidth().padding(start = Gutter, end = Gutter, bottom = 8.dp),
+        modifier = Modifier.fillMaxWidth().padding(start = Gutter, end = Gutter, bottom = 8.dp).onFocusChanged { onFocus(it.hasFocus) },
     )
 }
 

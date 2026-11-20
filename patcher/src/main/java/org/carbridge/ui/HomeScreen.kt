@@ -16,7 +16,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.animation.core.animate
+import androidx.compose.foundation.MutatePriority
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.foundation.layout.isImeVisible
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -111,9 +116,9 @@ class HomeActions(
 /** Below this many apps the list is short enough to scroll by hand. */
 private const val INDEX_MIN_APPS = 15
 
-private val APP_LIST_KEYS = setOf("add-title", "add-file", "search", "auto-toggle", "add-empty", "footer")
+private val APP_LIST_KEYS = setOf("add-title", "add-file", "search", "auto-toggle", "add-empty", "footer", "search-room")
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun HomeScreen(model: HomeModel, actions: HomeActions) {
     val snackbar = remember { SnackbarHostState() }
@@ -122,6 +127,7 @@ fun HomeScreen(model: HomeModel, actions: HomeActions) {
     var showSettings by rememberSaveable { mutableStateOf(false) }
     var showSetup by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
+    var searchFocused by remember { mutableStateOf(false) }
     var cautionFor by remember { mutableStateOf<SourceApp?>(null) }
     // One app from its row, or several from a selection
     var restoreFirstFor by remember { mutableStateOf<List<SourceApp>?>(null) }
@@ -176,6 +182,10 @@ fun HomeScreen(model: HomeModel, actions: HomeActions) {
         }
     }
     BackHandler(enabled = selecting) { stopSelecting() }
+    // Hiding the keyboard leaves the search focused, so the next tap wouldn't scroll it up again
+    val imeVisible = WindowInsets.isImeVisible
+    val focusManager = LocalFocusManager.current
+    LaunchedEffect(imeVisible) { if (!imeVisible) focusManager.clearFocus() }
 
     Scaffold(
         // Edge to edge: lift messages above the navigation bar unless the progress bar already does
@@ -332,7 +342,21 @@ fun HomeScreen(model: HomeModel, actions: HomeActions) {
                 }
                 if (catalog != null) {
                     if (catalog.available.size > 6) {
-                        item("search") { SearchField(query) { query = it } }
+                        item("search") {
+                            val topInset = WindowInsets.statusBars.getTop(LocalDensity.current)
+                            SearchField(query, onChange = { query = it }) { focused ->
+                                searchFocused = focused
+                                if (focused) scope.launch {
+                                    // Up to just below the status bar, so the results get the screen
+                                    val target = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.key == "search" } ?: return@launch
+                                    // Above the keyboard's own bring-into-view scroll, which would cancel this one
+                                    listState.scroll(MutatePriority.UserInput) {
+                                        var done = 0f
+                                        animate(0f, (target.offset - topInset).toFloat()) { value, _ -> done += scrollBy(value - done) }
+                                    }
+                                }
+                            }
+                        }
                     }
                     val autoCount = catalog.available.count { it.hasAndroidAuto }
                     if (search.isEmpty() && autoCount > 0) {
@@ -358,7 +382,14 @@ fun HomeScreen(model: HomeModel, actions: HomeActions) {
                     }
                 }
 
-                item("footer") { Footer(onAbout = { showAbout = true }) }
+                if (searchFocused || search.isNotEmpty()) {
+                    // A short result list can't scroll that far, so room below keeps the search at the top
+                    item("search-room") {
+                        Spacer(Modifier.height(with(LocalDensity.current) { listState.layoutInfo.viewportSize.height.toDp() }))
+                    }
+                } else {
+                    item("footer") { Footer(onAbout = { showAbout = true }) }
+                }
             }
 
             if (indexed) {
