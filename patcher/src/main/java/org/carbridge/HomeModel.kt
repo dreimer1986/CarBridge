@@ -8,12 +8,15 @@ import android.os.SystemClock
 import android.os.storage.StorageManager
 import android.util.Log
 import androidx.annotation.StringRes
+import androidx.car.app.connection.CarConnection
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.LiveData
+import androidx.lifecycle.Observer
 import androidx.lifecycle.viewModelScope
 import java.io.File
 import java.time.LocalDate
@@ -116,6 +119,22 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
         if (shizuku == ShizukuMode.State.Ready) switchShizuku(true)
     }
 
+    /** Android Auto is running, on a car screen or the phone's head unit connection. */
+    var carConnected by mutableStateOf(false)
+        private set
+    /** A copy was added during this Android Auto connection, which only lists apps when it starts. */
+    var reconnectNeeded by mutableStateOf(false)
+        private set
+    private val carType: LiveData<Int> = CarConnection(app).type
+    private val carChanged = Observer<Int> { type ->
+        carConnected = type != CarConnection.CONNECTION_TYPE_NOT_CONNECTED
+        if (!carConnected) reconnectNeeded = false
+    }
+
+    fun dismissReconnect() {
+        reconnectNeeded = false
+    }
+
     fun switchShizuku(on: Boolean) {
         ShizukuMode.setEnabled(getApplication(), on)
         useShizuku = on
@@ -146,6 +165,7 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
         Shizuku.addBinderReceivedListenerSticky(shizukuChanged)
         Shizuku.addBinderDeadListener(shizukuGone)
         Shizuku.addRequestPermissionResultListener(shizukuAnswered)
+        carType.observeForever(carChanged)
         viewModelScope.launch {
             CopyBuilder.building.collect { pkg ->
                 // The screen's own builds already show their progress
@@ -174,6 +194,7 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
                         delay(ARRIVAL_MS)
                     }
                     job = null
+                    if (result.success && !current.update && carConnected) reconnectNeeded = true
                     if (result.success && !prefs.getBoolean(Prefs.ASKED_NOTIFICATIONS, false)) {
                         prefs.edit().putBoolean(Prefs.ASKED_NOTIFICATIONS, true).apply()
                         _notificationPrompt.send(Unit)
@@ -183,7 +204,9 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
                     _messages.send(
                         when {
                             problem != null -> UserMessage(text(R.string.msg_added_problem, current.label, text(problem.text)))
-                            result.success -> UserMessage(text(R.string.msg_added, current.label))
+                            result.success && current.update -> UserMessage(text(R.string.msg_updated, current.label))
+                            result.success && carConnected -> UserMessage(text(R.string.msg_added, current.label))
+                            result.success -> UserMessage(text(R.string.msg_added_later, current.label))
                             result.cancelled -> UserMessage(text(R.string.msg_install_cancelled))
                             else -> UserMessage(text(R.string.msg_add_failed, current.label), details(result.message))
                         },
@@ -665,6 +688,7 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
         Shizuku.removeBinderReceivedListener(shizukuChanged)
         Shizuku.removeBinderDeadListener(shizukuGone)
         Shizuku.removeRequestPermissionResultListener(shizukuAnswered)
+        carType.removeObserver(carChanged)
         // The patch runs in viewModelScope, which is cancelled with the model
         PatchService.stop(getApplication())
     }

@@ -40,6 +40,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -52,6 +53,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
+import androidx.compose.material3.Surface
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -254,6 +256,9 @@ fun HomeScreen(model: HomeModel, actions: HomeActions) {
                 }
 
                 item("car-title") { SectionTitle(stringResource(R.string.on_your_car)) }
+                if (model.reconnectNeeded) {
+                    item("reconnect") { ReconnectCallout(onDismiss = model::dismissReconnect) }
+                }
                 val copyBytes = catalog?.copies.orEmpty().sumOf { it.sizeBytes }
                 if (copyBytes > 0) {
                     item("car-storage") {
@@ -507,5 +512,20 @@ private fun Footer(onAbout: () -> Unit) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         OutlinedButton(onClick = onAbout, modifier = Modifier.padding(top = 12.dp)) { Text(stringResource(R.string.how_it_works)) }
+    }
+}
+
+@Composable
+private fun ReconnectCallout(onDismiss: () -> Unit) {
+    Surface(
+        Modifier.fillMaxWidth().padding(start = Gutter, end = Gutter, bottom = 12.dp),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.secondaryContainer,
+    ) {
+        Column(Modifier.padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 4.dp)) {
+            Text(stringResource(R.string.reconnect_title), style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.reconnect_body), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 4.dp))
+            TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) { Text(stringResource(R.string.got_it)) }
+        }
     }
 }

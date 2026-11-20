@@ -92,6 +92,7 @@ dependencies {
     implementation("androidx.compose.ui:ui-text-google-fonts")
     implementation("androidx.compose.material:material-icons-core")
     implementation("androidx.activity:activity-compose:1.11.0")
+    implementation("androidx.car.app:app:1.7.0")
 }
 
 dependencies {
