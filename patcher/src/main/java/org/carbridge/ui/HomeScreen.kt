@@ -134,25 +134,26 @@ import org.carbridge.Version
 import org.carbridge.core.CarOptions
 import org.carbridge.patch.KeyBackup
 
+/** Home screen callbacks; each defaults to a no-op, so screenshots need none. */
 class HomeActions(
-    val allowInstalls: () -> Unit,
-    val openAndroidAuto: () -> Unit,
-    val markDeveloperMode: () -> Unit,
-    val markUnknownSources: () -> Unit,
-    val add: (SourceApp) -> Unit,
-    val update: (CarCopy) -> Unit,
-    val updateAll: (List<CarCopy>) -> Unit,
-    val openMorphe: () -> Unit,
-    val setFillScreen: (CarCopy, Boolean) -> Unit,
-    val setKeepMedia: (CarCopy, Boolean) -> Unit,
-    val setHideOnPhone: (CarCopy, Boolean) -> Unit,
-    val remove: (CarCopy) -> Unit,
-    val open: (CarCopy) -> Unit,
+    val allowInstalls: () -> Unit = {},
+    val openAndroidAuto: () -> Unit = {},
+    val markDeveloperMode: () -> Unit = {},
+    val markUnknownSources: () -> Unit = {},
+    val add: (SourceApp) -> Unit = {},
+    val update: (CarCopy) -> Unit = {},
+    val updateAll: (List<CarCopy>) -> Unit = {},
+    val openMorphe: () -> Unit = {},
+    val setFillScreen: (CarCopy, Boolean) -> Unit = { _, _ -> },
+    val setKeepMedia: (CarCopy, Boolean) -> Unit = { _, _ -> },
+    val setHideOnPhone: (CarCopy, Boolean) -> Unit = { _, _ -> },
+    val remove: (CarCopy) -> Unit = {},
+    val open: (CarCopy) -> Unit = {},
     /** Opens Android's file picker to save the key backup under the given name. */
-    val saveBackup: (String) -> Unit,
-    val pickBackup: () -> Unit,
+    val saveBackup: (String) -> Unit = {},
+    val pickBackup: () -> Unit = {},
     /** Opens the file picker for APKs; with a copy, the files must be a newer version of its app. */
-    val pickApks: (CarCopy?) -> Unit,
+    val pickApks: (CarCopy?) -> Unit = {},
 )
 
 private val SignShape = RoundedCornerShape(20.dp)
