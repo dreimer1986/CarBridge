@@ -3,6 +3,7 @@ package org.carbridge
 import android.app.Application
 import android.content.pm.ApplicationInfo
 import android.net.Uri
+import android.os.storage.StorageManager
 import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -447,7 +448,9 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
                             context.contentResolver.openInputStream(uri)!!.use { input -> file.outputStream().use(input::copyTo) }
                         }
                     }
-                    val import = ApkImport.read(files, dir)
+                    // Includes cache Android would clear to make room, like PatchPipeline's check
+                    val storage = context.getSystemService(StorageManager::class.java)
+                    val import = ApkImport.read(files, dir, storage.getAllocatableBytes(storage.getUuidForPath(dir)))
                     if (expected != null && import.packageName != expected) {
                         throw ImportFailure("That file is a different app (${import.packageName}). Pick the one this copy was made from.")
                     }

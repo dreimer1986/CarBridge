@@ -30,10 +30,21 @@ class ApkImport(val base: File, val splits: List<File>, val packageName: String,
         /** Where picked files are copied; apart from the patch folder, which each build empties. */
         fun workDir(cacheDir: File) = File(cacheDir, "import")
 
-        /** Reads [files] (already copied into [dir]) and unpacks bundles into it. */
-        fun read(files: List<File>, dir: File): ApkImport {
+        /** More APKs than any real bundle holds; Play splits by CPU, density and language. */
+        private const val MAX_BUNDLE_APKS = 200
+        private const val MB = 1024L * 1024
+
+        /**
+         * Reads [files] (already copied into [dir]) and unpacks bundles into it, writing at most
+         * [room] bytes, so a broken or hostile bundle can't fill the phone's storage.
+         */
+        fun read(files: List<File>, dir: File, room: Long = dir.usableSpace): ApkImport {
             if (files.isEmpty()) throw ImportFailure("No file was picked.")
-            val apks = files.flatMap { file -> if (isBundle(file)) unpack(file, dir) else listOf(file) }
+            var left = room
+            val apks = files.flatMap { file ->
+                if (!isBundle(file)) return@flatMap listOf(file)
+                unpack(file, dir, left).also { unpacked -> left -= unpacked.sumOf { it.length() } }
+            }
             if (apks.isEmpty()) throw ImportFailure("There's no APK in that file.")
 
             val parts = apks.map(::describe)
@@ -81,16 +92,34 @@ class ApkImport(val base: File, val splits: List<File>, val packageName: String,
             }
         }.getOrDefault(false)
 
-        private fun unpack(bundle: File, dir: File): List<File> = ZipFile(bundle).use { zip ->
-            zip.entries().asSequence()
-                .filter { !it.isDirectory && it.name.endsWith(".apk") }
-                .mapIndexed { i, entry ->
-                    // Index-based names: entry paths can't escape the folder or collide
-                    File(dir, "bundle-$i.apk").also { out ->
-                        zip.getInputStream(entry).use { input -> out.outputStream().use(input::copyTo) }
+        private fun unpack(bundle: File, dir: File, room: Long): List<File> = ZipFile(bundle).use { zip ->
+            val entries = zip.entries().asSequence().filter { !it.isDirectory && it.name.endsWith(".apk") }.toList()
+            if (entries.size > MAX_BUNDLE_APKS) throw ImportFailure("${bundle.name} holds ${entries.size} APKs, too many for one app.")
+            // Sizes in the zip can be missing or wrong, so the copy below counts bytes as well
+            val declared = entries.sumOf { it.size.coerceAtLeast(0) }
+            if (declared > room) throw tooBig(declared, room)
+            var written = 0L
+            entries.mapIndexed { i, entry ->
+                // Index-based names: entry paths can't escape the folder or collide
+                File(dir, "bundle-$i.apk").also { out ->
+                    zip.getInputStream(entry).use { input ->
+                        out.outputStream().use { output ->
+                            val buffer = ByteArray(64 * 1024)
+                            while (true) {
+                                val n = input.read(buffer)
+                                if (n < 0) break
+                                written += n
+                                if (written > room) throw tooBig(written, room)
+                                output.write(buffer, 0, n)
+                            }
+                        }
                     }
                 }
-                .toList()
+            }
         }
+
+        private fun tooBig(needed: Long, room: Long) = ImportFailure(
+            "Not enough free space to unpack this bundle: it needs more than ${needed / MB} MB, ${room / MB} MB free.",
+        )
     }
 }
