@@ -18,6 +18,9 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import org.carbridge.core.CarOptions
 import org.carbridge.patch.IconBadger
 import org.carbridge.ui.CarBridgeTheme
@@ -30,7 +33,25 @@ class ScreenshotActivity : ComponentActivity() {
         enableEdgeToEdge(statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT))
         super.onCreate(savedInstanceState)
         val model = ViewModelProvider(this)[HomeModel::class.java]
-        model.showSample(sampleCatalog())
+        val catalog = sampleCatalog()
+        model.showSample(catalog)
+        // Progress bar shots: --ef progress 0.4, or --ez demo true to drive across (--ez silent true: no prompt)
+        val app = catalog.available.first()
+        val start = intent.getFloatExtra("progress", -1f)
+        if (start >= 0f || intent.getBooleanExtra("demo", false)) {
+            model.showSampleJob(Job(app.label, app.icon, app.info.packageName + ".car", update = false, step = JobStep.Patch.ordinal, progress = start.coerceAtLeast(0f)))
+        }
+        if (intent.getBooleanExtra("demo", false)) {
+            lifecycleScope.launch {
+                for (i in 1..10) {
+                    delay(700)
+                    model.showSampleJob(model.job?.copy(step = if (i < 7) JobStep.Patch.ordinal else JobStep.Sign.ordinal, progress = i / 10f))
+                }
+                model.showSampleJob(model.job?.copy(step = JobStep.Confirm.ordinal, silent = intent.getBooleanExtra("silent", false)))
+                delay(2500)
+                model.showSampleJob(model.job?.copy(step = JobStep.Installed.ordinal))
+            }
+        }
         val none = HomeActions()
         setContent { CarBridgeTheme { HomeScreen(model, none) } }
     }

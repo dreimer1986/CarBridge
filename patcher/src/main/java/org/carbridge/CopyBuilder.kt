@@ -28,6 +28,7 @@ object CopyBuilder {
         app: ApplicationInfo,
         log: (String) -> Unit,
         background: Boolean = false,
+        progress: (Float) -> Unit = {},
         onPatched: () -> Unit = {},
     ): Boolean {
         val carPackage = PatchPipeline.carPackageName(app.packageName)
@@ -36,7 +37,7 @@ object CopyBuilder {
             val options = options(context, app.packageName)
             // Saved per copy, so later changes to the defaults leave existing copies as they are
             save(context, app.packageName, options)
-            val apks = PatchPipeline(context, log).patch(app, options)
+            val apks = PatchPipeline(context, log, progress).patch(app, options)
             onPatched()
             if (!ShizukuMode.install(context, apks, carPackage, background, log)) {
                 Installer.install(context, apks, carPackage, background)

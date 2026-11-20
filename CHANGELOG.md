@@ -29,6 +29,7 @@ What changed in each CarBridge release. Dev pre-releases show the Unreleased sec
 - Text is easier to read, with tighter letter spacing
 - Car copies show their app's own icon in CarBridge, without the badge covering it
 - Settings puts Shizuku under Advanced
+- While a copy is made, a little car carries the app over a bridge, showing how far along it is, waits at a gate while Android asks you to confirm the install, and drives off once the copy is installed. Tap the car to honk
 
 ## [0.6.0] - 2026-11-17
 

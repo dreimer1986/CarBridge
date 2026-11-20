@@ -19,6 +19,7 @@ import java.io.File
 import java.time.LocalDate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -34,6 +35,9 @@ import org.carbridge.patch.PatchPipeline
 
 private const val TAG = "CarBridge"
 
+// How long the progress bar shows a finished install, so its car can drive off the bridge
+private const val ARRIVAL_MS = 1400L
+
 /** A car copy being made; [step] indexes [JobStep]. */
 data class Job(
     val label: String,
@@ -43,6 +47,8 @@ data class Job(
     val step: Int,
     /** Installing through Shizuku, so Android won't show a prompt. */
     val silent: Boolean = false,
+    /** Share of the patching done, 0..1; installing starts at 1. */
+    val progress: Float = 0f,
 ) {
     /** [waiting] is how many more copies an Update all run will build after this one. */
     fun headline(context: Context, waiting: Int): String = when {
@@ -67,6 +73,7 @@ enum class JobStep(@StringRes val text: Int) {
     Patch(R.string.step_patch),
     Sign(R.string.step_sign),
     Confirm(R.string.step_confirm),
+    Installed(R.string.step_installed),
 }
 
 data class Setup(val canInstall: Boolean, val developerMode: Boolean, val unknownSources: Boolean) {
@@ -160,6 +167,11 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
             Installer.events.collect { result ->
                 val current = job
                 if (current != null && (result.packageName ?: current.packageName) == current.packageName) {
+                    if (result.success) {
+                        // Let the progress car finish its crossing before the bar goes away
+                        job = current.copy(step = JobStep.Installed.ordinal, progress = 1f)
+                        delay(ARRIVAL_MS)
+                    }
                     job = null
                     if (result.success && !prefs.getBoolean(Prefs.ASKED_NOTIFICATIONS, false)) {
                         prefs.edit().putBoolean(Prefs.ASKED_NOTIFICATIONS, true).apply()
@@ -267,6 +279,11 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
     fun showSample(catalog: Catalog) {
         sample = catalog
         refresh()
+    }
+
+    /** Screenshots only: a made-up build in progress over the sample catalog. */
+    fun showSampleJob(sampleJob: Job?) {
+        if (sample != null) job = sampleJob
     }
 
     fun refresh() {
@@ -593,8 +610,13 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val started = try {
                 withContext(Dispatchers.IO) {
-                    CopyBuilder.build(context, info, ::onLog) {
-                        viewModelScope.launch { job = job?.copy(step = JobStep.Confirm.ordinal) }
+                    CopyBuilder.build(
+                        context,
+                        info,
+                        ::onLog,
+                        progress = { done -> viewModelScope.launch { job = job?.copy(progress = maxOf(job?.progress ?: 0f, done)) } },
+                    ) {
+                        viewModelScope.launch { job = job?.copy(step = JobStep.Confirm.ordinal, progress = 1f) }
                     }
                 }
             } catch (e: Throwable) {
