@@ -1,0 +1,19 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    labels: []
+    directory: /
+    target-branch: dev
+    schedule:
+      interval: monthly
+
+  # AGP and AndroidX are pinned until the move to AGP 9.1 and compileSdk 37 (see README)
+  - package-ecosystem: gradle
+    labels: []
+    directory: /
+    target-branch: dev
+    schedule:
+      interval: monthly
+    ignore:
+      - dependency-name: "com.android.application"
+        update-types: ["version-update:semver-major"]
