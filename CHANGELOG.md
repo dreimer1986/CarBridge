@@ -17,6 +17,7 @@ What changed in each CarBridge release. Dev pre-releases show the Unreleased sec
 - Settings → For new copies: choose whether new copies fill the screen, use Android Auto's audio player or hide from the phone's app list
 - Settings → Check a backup: test a key backup and its code without restoring it
 - Moving to a new phone: key backups now list your copies, and restoring one offers to put them all back on your car with the same choices
+- After installing, CarBridge checks that Android Auto can list the copy, and a copy that can't says why
 
 ## [0.6.0] - 2026-11-17
 

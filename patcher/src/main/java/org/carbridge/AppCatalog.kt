@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.drawable.Drawable
+import androidx.annotation.StringRes
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import java.io.File
@@ -57,6 +58,8 @@ data class CarCopy(
     val fromFile: Boolean = false,
     /** The user hasn't opted this copy out of automatic updates. */
     val autoUpdateAllowed: Boolean = true,
+    /** Why Android Auto won't list this copy, or null when it has what Android Auto needs. */
+    val carProblem: CarProblem? = null,
 ) {
     /** A key backup could make this copy updatable again. */
     val needsRestore get() = signedElsewhere && !madeByOtherCarBridge
@@ -69,6 +72,13 @@ data class CarCopy(
 }
 
 data class Version(val code: Long, val name: String?)
+
+/** What an installed copy lacks that Android Auto needs to list it. */
+enum class CarProblem(@StringRes val text: Int) {
+    NoCarLauncher(R.string.car_problem_launcher),
+    NoCarSettings(R.string.car_problem_settings),
+    NoCarPermission(R.string.car_problem_permission),
+}
 
 data class Catalog(val copies: List<CarCopy>, val available: List<SourceApp>)
 
@@ -127,6 +137,7 @@ object AppCatalog {
                 autoUpdateAllowed = AutoUpdate.isAllowed(context, originalPkg),
                 fromFile = original == null && context.getSharedPreferences("setup", 0).getBoolean("from_file:$originalPkg", false),
                 signedElsewhere = !signer.canUpdate(pm, info.packageName),
+                carProblem = carProblem(pm, info.packageName),
                 madeByOtherCarBridge = installer(pm, info.packageName).let { by ->
                     by != null && by != context.packageName && (by == CARBRIDGE_ID || by.startsWith("$CARBRIDGE_ID.")) && isInstalled(pm, by)
                 },
@@ -136,6 +147,22 @@ object AppCatalog {
         val copied = copies.mapNotNull { it.original?.info?.packageName }.toSet()
         val available = sources.values.filter { it.info.packageName !in copied }.sortedBy { it.label.lowercase() }
         return Catalog(copies, available)
+    }
+
+    /**
+     * Checks installed [pkg] the way Android Auto finds apps: an activity in the car launcher, the
+     * car app meta-data and the car screen permissions. Android Auto's own settings, such as
+     * Unknown sources, can't be read from here.
+     */
+    fun carProblem(pm: PackageManager, pkg: String): CarProblem? {
+        val carLauncher = Intent(Intent.ACTION_MAIN).addCategory(CarPatch.CAR_CATEGORIES[0]).setPackage(pkg)
+        if (pm.queryIntentActivities(carLauncher, 0).isEmpty()) return CarProblem.NoCarLauncher
+        val info = runCatching { pm.getPackageInfo(pkg, PackageManager.GET_META_DATA or PackageManager.GET_PERMISSIONS) }.getOrNull()
+            ?: return CarProblem.NoCarLauncher
+        if (info.applicationInfo?.metaData?.containsKey(CAR_APP_META) != true) return CarProblem.NoCarSettings
+        val requested = info.requestedPermissions.orEmpty().toSet()
+        if (CarPatch.CAR_PERMISSIONS.any { it !in requested }) return CarProblem.NoCarPermission
+        return null
     }
 
     /** Apps already on the car launcher, e.g. copies made by other tools such as AAAnything. */

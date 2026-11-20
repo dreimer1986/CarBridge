@@ -695,6 +695,7 @@ private fun CarSign(
                                 copy.original == null -> stringResource(R.string.copy_original_removed)
                                 copy.madeByOtherCarBridge -> stringResource(R.string.copy_other_carbridge)
                                 copy.signedElsewhere -> stringResource(R.string.copy_restore_key)
+                                copy.carProblem != null -> stringResource(R.string.car_problem_subtitle, stringResource(copy.carProblem.text))
                                 copy.outdated -> "${versionText(copy.version!!, copy.originalVersion!!)} → " +
                                     versionText(copy.originalVersion, copy.version)
                                 else -> copy.version?.name ?: stringResource(R.string.copy_in_android_auto)

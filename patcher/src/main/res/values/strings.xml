@@ -69,6 +69,10 @@
     <string name="copy_restore_key">Restore your key to update it</string>
     <string name="copy_in_android_auto">In Android Auto</string>
     <string name="version_build">build %d</string>
+    <string name="car_problem_subtitle">Not in Android Auto: %s</string>
+    <string name="car_problem_launcher">no car launcher entry</string>
+    <string name="car_problem_settings">car settings missing</string>
+    <string name="car_problem_permission">car screen permission missing</string>
     <string name="update">Update</string>
     <string name="update_ready">UPDATE READY</string>
     <string name="menu_open_on_phone">Open on phone</string>
@@ -203,7 +207,8 @@
     <string name="backup_restore_failed">This backup couldn\'t be restored.</string>
 
     <!-- Messages -->
-    <string name="msg_added">%s is on your car. Reconnect your phone to Android Auto to see it.</string>
+    <string name="msg_added">%s is ready for Android Auto. Reconnect your phone to Android Auto to see it.</string>
+    <string name="msg_added_problem">%1$s installed, but Android Auto won\'t list it (%2$s). Try Update copy from its ⋮ menu.</string>
     <string name="msg_install_cancelled">Install cancelled.</string>
     <string name="msg_add_failed">Couldn\'t add %s.</string>
     <string name="msg_backup_failed">Couldn\'t make a key backup.</string>

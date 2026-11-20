@@ -170,8 +170,11 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
                         prefs.edit().putBoolean("asked_notifications", true).apply()
                         _notificationPrompt.send(Unit)
                     }
+                    // Checked after installing, so the user hears now rather than in the car
+                    val problem = if (result.success) withContext(Dispatchers.IO) { AppCatalog.carProblem(app.packageManager, current.packageName) } else null
                     _messages.send(
                         when {
+                            problem != null -> UserMessage(text(R.string.msg_added_problem, current.label, text(problem.text)))
                             result.success -> UserMessage(text(R.string.msg_added, current.label))
                             result.cancelled -> UserMessage(text(R.string.msg_install_cancelled))
                             else -> UserMessage(text(R.string.msg_add_failed, current.label), details(result.message))
