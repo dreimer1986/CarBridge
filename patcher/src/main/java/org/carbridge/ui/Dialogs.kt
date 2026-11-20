@@ -122,6 +122,18 @@ internal fun CautionDialog(app: SourceApp, onDismiss: () -> Unit, onAddAnyway: (
     }
 }
 
+/** Before adding several apps, names the ones whose copies may refuse to run. */
+@Composable
+internal fun BatchCautionDialog(risky: List<SourceApp>, onAddAll: () -> Unit, onLeaveOut: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.batch_caution_title)) },
+        text = { Text(stringResource(R.string.batch_caution_body, risky.joinToString { it.label })) },
+        confirmButton = { TextButton(onClick = onAddAll) { Text(stringResource(R.string.add_all)) } },
+        dismissButton = { TextButton(onClick = onLeaveOut) { Text(stringResource(R.string.leave_them_out)) } },
+    )
+}
+
 @Composable
 internal fun BackupCodeDialog(code: String, onSave: () -> Unit, onDismiss: () -> Unit) {
     val context = LocalContext.current

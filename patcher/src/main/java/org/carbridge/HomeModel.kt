@@ -52,7 +52,8 @@ data class Job(
 ) {
     /** [waiting] is how many more copies an Update all run will build after this one. */
     fun headline(context: Context, waiting: Int): String = when {
-        waiting > 0 -> context.resources.getQuantityString(R.plurals.job_updating_more, waiting, label, waiting)
+        waiting > 0 && update -> context.resources.getQuantityString(R.plurals.job_updating_more, waiting, label, waiting)
+        waiting > 0 -> context.resources.getQuantityString(R.plurals.job_adding_more, waiting, label, waiting)
         update -> context.getString(R.string.job_updating, label)
         else -> context.getString(R.string.job_adding, label)
     }
@@ -207,6 +208,14 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
         if (job != null) return
         updateQueue.clear()
         updateQueue.addAll(restorable.map { it to false })
+        nextQueued(continueRun = true)
+    }
+
+    /** Adds several apps one after another, each with the choices for new copies from Settings. */
+    fun addSeveral(apps: List<SourceApp>) {
+        if (job != null || apps.isEmpty()) return
+        updateQueue.clear()
+        updateQueue.addAll(apps.map { it to false })
         nextQueued(continueRun = true)
     }
 

@@ -1,6 +1,7 @@
 package org.carbridge.ui
 
 import android.app.Activity
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.fadeIn
@@ -12,6 +13,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
@@ -33,7 +35,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -112,7 +116,11 @@ fun HomeScreen(model: HomeModel, actions: HomeActions) {
     var showSetup by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
     var cautionFor by remember { mutableStateOf<SourceApp?>(null) }
-    var restoreFirstFor by remember { mutableStateOf<SourceApp?>(null) }
+    // One app from its row, or several from a selection
+    var restoreFirstFor by remember { mutableStateOf<List<SourceApp>?>(null) }
+    var batchCaution by remember { mutableStateOf<List<SourceApp>?>(null) }
+    var selecting by rememberSaveable { mutableStateOf(false) }
+    var selected by rememberSaveable { mutableStateOf(emptyList<String>()) }
     var backupLater by rememberSaveable { mutableStateOf(false) }
 
     val detailsLabel = stringResource(R.string.details)
@@ -148,15 +156,42 @@ fun HomeScreen(model: HomeModel, actions: HomeActions) {
     val lost = catalog?.copies?.count { it.needsRestore } ?: 0
     val offerRestore = lost > 0 && !model.restoreDeclined
     val addApp = { app: SourceApp -> if (app.caution != null) cautionFor = app else actions.add(app) }
+    val stopSelecting = { selecting = false; selected = emptyList() }
+    val addBatch = { apps: List<SourceApp> ->
+        if (apps.any { it.caution != null }) batchCaution = apps else model.addSeveral(apps)
+    }
+    val addApps = { apps: List<SourceApp> ->
+        when {
+            apps.isEmpty() -> Unit
+            offerRestore -> restoreFirstFor = apps
+            apps.size == 1 -> addApp(apps.single())
+            else -> addBatch(apps)
+        }
+    }
+    BackHandler(enabled = selecting) { stopSelecting() }
 
     Scaffold(
         // Edge to edge: lift messages above the navigation bar unless the progress bar already does
-        snackbarHost = { SnackbarHost(snackbar, if (busy) Modifier else Modifier.navigationBarsPadding()) },
+        snackbarHost = { SnackbarHost(snackbar, if (busy || selecting) Modifier else Modifier.navigationBarsPadding()) },
         bottomBar = {
-            AnimatedVisibility(busy, enter = slideInVertically { it }, exit = slideOutVertically { it }) {
-                when {
-                    job != null -> JobBar(job, waiting = (model.queued - 1).coerceAtLeast(0))
-                    model.backgroundBuild != null -> BackgroundBar(model.backgroundBuild!!)
+            Box {
+                AnimatedVisibility(busy, enter = slideInVertically { it }, exit = slideOutVertically { it }) {
+                    when {
+                        job != null -> JobBar(job, waiting = (model.queued - 1).coerceAtLeast(0))
+                        model.backgroundBuild != null -> BackgroundBar(model.backgroundBuild!!)
+                    }
+                }
+                AnimatedVisibility(selecting && !busy, enter = slideInVertically { it }, exit = slideOutVertically { it }) {
+                    SelectionBar(
+                        count = selected.size,
+                        onCancel = stopSelecting,
+                        onAdd = {
+                            // In list order, which is the order they're built in
+                            val apps = catalog?.available.orEmpty().filter { it.info.packageName in selected }
+                            stopSelecting()
+                            addApps(apps)
+                        },
+                    )
                 }
             }
         },
@@ -252,15 +287,24 @@ fun HomeScreen(model: HomeModel, actions: HomeActions) {
 
                 item("add-title") { SectionTitle(stringResource(R.string.add_an_app)) }
                 item("add-file") {
-                    // Secondary to the list below: most people add apps that are already installed
-                    TextButton(
-                        onClick = { actions.pickApks(null) },
-                        enabled = !busy,
-                        modifier = Modifier.padding(start = Gutter - 12.dp, end = Gutter, bottom = 4.dp),
+                    Row(
+                        Modifier.fillMaxWidth().padding(start = Gutter - 12.dp, end = Gutter - 12.dp, bottom = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Icon(FileGlyph, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text(stringResource(R.string.add_from_file))
+                        // Secondary to the list below: most people add apps that are already installed
+                        TextButton(onClick = { actions.pickApks(null) }, enabled = !busy) {
+                            Icon(FileGlyph, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text(stringResource(R.string.add_from_file))
+                        }
+                        Spacer(Modifier.weight(1f))
+                        if (!selecting && (catalog?.available?.size ?: 0) > 1) {
+                            TextButton(onClick = { selecting = true }, enabled = !busy) {
+                                Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text(stringResource(R.string.select_several))
+                            }
+                        }
                     }
                 }
                 if (catalog != null) {
@@ -277,11 +321,16 @@ fun HomeScreen(model: HomeModel, actions: HomeActions) {
                         }
                     }
                     items(shown, key = { "src:" + it.info.packageName }) { app ->
+                        val pkg = app.info.packageName
                         SourceRow(
                             app,
                             enabled = !busy,
                             endPadding = if (indexed) Gutter + IndexWidth else Gutter,
-                            onAdd = { if (offerRestore) restoreFirstFor = app else addApp(app) },
+                            selecting = selecting,
+                            selected = pkg in selected,
+                            onAdd = { addApps(listOf(app)) },
+                            onToggle = { selected = if (pkg in selected) selected - pkg else selected + pkg },
+                            onStartSelecting = { selecting = true; selected = listOf(pkg) },
                         )
                     }
                 }
@@ -349,7 +398,15 @@ fun HomeScreen(model: HomeModel, actions: HomeActions) {
             onOpenMorphe = { cautionFor = null; actions.openMorphe() },
         )
     }
-    restoreFirstFor?.let { app ->
+    batchCaution?.let { apps ->
+        BatchCautionDialog(
+            risky = apps.filter { it.caution != null },
+            onAddAll = { batchCaution = null; model.addSeveral(apps) },
+            onLeaveOut = { batchCaution = null; model.addSeveral(apps.filter { it.caution == null }) },
+            onDismiss = { batchCaution = null },
+        )
+    }
+    restoreFirstFor?.let { apps ->
         AlertDialog(
             onDismissRequest = { restoreFirstFor = null },
             title = { Text(stringResource(R.string.restore_first_title)) },
@@ -357,7 +414,12 @@ fun HomeScreen(model: HomeModel, actions: HomeActions) {
             confirmButton = {
                 TextButton(onClick = { restoreFirstFor = null; actions.pickBackup() }) { Text(stringResource(R.string.restore_backup)) }
             },
-            dismissButton = { TextButton(onClick = { restoreFirstFor = null; addApp(app) }) { Text(stringResource(R.string.add_without_key)) } },
+            dismissButton = {
+                TextButton(onClick = {
+                    restoreFirstFor = null
+                    if (apps.size == 1) addApp(apps.single()) else addBatch(apps)
+                }) { Text(stringResource(R.string.add_without_key)) }
+            },
         )
     }
     model.newBackup?.let { backup ->

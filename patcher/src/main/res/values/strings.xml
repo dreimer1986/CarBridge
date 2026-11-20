@@ -36,6 +36,22 @@
     <string name="car_empty">Nothing yet. Add an app below, then reconnect your phone to Android Auto.</string>
     <string name="add_an_app">Add an app</string>
     <string name="add_from_file">Add from an APK file</string>
+    <string name="select_several">Select several</string>
+    <string name="select_label">Select</string>
+    <string name="stop_selecting">Stop selecting</string>
+    <plurals name="selected_count">
+        <item quantity="one">%d app selected</item>
+        <item quantity="other">%d apps selected</item>
+    </plurals>
+    <plurals name="add_selected">
+        <item quantity="one">Add %d</item>
+        <item quantity="other">Add %d</item>
+    </plurals>
+    <string name="selection_hint">New copies use your choices in Settings.</string>
+    <string name="batch_caution_title">Some may not work as car copies</string>
+    <string name="batch_caution_body">These check their license or were patched with Morphe, so their copies may refuse to run: %s</string>
+    <string name="add_all">Add all</string>
+    <string name="leave_them_out">Leave them out</string>
     <string name="add_empty_all">Every app you can add is already on your car.</string>
     <string name="add_empty_search">No apps match “%s”.</string>
     <string name="restore_first_title">Restore your key first?</string>
@@ -148,6 +164,10 @@
     </plurals>
     <string name="job_updating">Updating %s</string>
     <string name="job_adding">Adding %s to your car</string>
+    <plurals name="job_adding_more">
+        <item quantity="one">Adding %1$s, %2$d more after</item>
+        <item quantity="other">Adding %1$s, %2$d more after</item>
+    </plurals>
     <string name="step_read">Reading the app</string>
     <string name="step_patch">Making the car copy</string>
     <string name="step_sign">Signing it on this phone</string>

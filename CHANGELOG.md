@@ -30,6 +30,7 @@ What changed in each CarBridge release. Dev pre-releases show the Unreleased sec
 - Car copies show their app's own icon in CarBridge, without the badge covering it
 - Settings puts Shizuku under Advanced
 - While a copy is made, a little car carries the app over a bridge, showing how far along it is, waits at a gate while Android asks you to confirm the install, and drives off once the copy is installed. Tap the car to honk
+- Add several apps at once: tap Select several, or long-press an app, then tick the ones you want; they're added one after another with your choices from Settings
 
 ## [0.6.0] - 2026-11-17
 

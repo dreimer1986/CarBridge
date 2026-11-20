@@ -1,23 +1,29 @@
 package org.carbridge.ui
 
 import android.text.format.Formatter
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
@@ -28,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
@@ -77,12 +84,32 @@ internal fun AutoAppsToggle(count: Int, showing: Boolean, onToggle: () -> Unit) 
 }
 
 @Composable
-internal fun SourceRow(app: SourceApp, enabled: Boolean, endPadding: Dp, onAdd: () -> Unit) {
+internal fun SourceRow(
+    app: SourceApp,
+    enabled: Boolean,
+    endPadding: Dp,
+    selecting: Boolean,
+    selected: Boolean,
+    onAdd: () -> Unit,
+    onToggle: () -> Unit,
+    onStartSelecting: () -> Unit,
+) {
     val context = LocalContext.current
-    // The whole row adds the app; the trailing button only marks it, so TalkBack hears one action
+    // Tap adds (or ticks, while selecting); a long press starts selecting several
+    val action = if (selecting) {
+        Modifier.toggleable(value = selected, enabled = enabled, role = Role.Checkbox) { onToggle() }
+    } else {
+        Modifier.combinedClickable(
+            enabled = enabled,
+            onClickLabel = stringResource(R.string.add_title, app.label),
+            onLongClickLabel = stringResource(R.string.select_label),
+            onLongClick = onStartSelecting,
+            onClick = onAdd,
+        )
+    }
     Row(
         Modifier.fillMaxWidth()
-            .clickable(enabled = enabled, onClickLabel = stringResource(R.string.add_title, app.label), onClick = onAdd)
+            .then(action)
             .padding(start = Gutter, end = endPadding, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -105,8 +132,39 @@ internal fun SourceRow(app: SourceApp, enabled: Boolean, endPadding: Dp, onAdd: 
             )
         }
         Spacer(Modifier.width(8.dp))
-        FilledTonalIconButton(onClick = onAdd, enabled = enabled, modifier = Modifier.clearAndSetSemantics {}) {
-            Icon(Icons.Rounded.Add, contentDescription = null)
+        if (selecting) {
+            Checkbox(checked = selected, onCheckedChange = null, enabled = enabled, modifier = Modifier.padding(horizontal = 4.dp))
+        } else {
+            FilledTonalIconButton(onClick = onAdd, enabled = enabled, modifier = Modifier.clearAndSetSemantics {}) {
+                Icon(Icons.Rounded.Add, contentDescription = null)
+            }
+        }
+    }
+}
+
+/** Shown in place of the progress bar while picking several apps to add. */
+@Composable
+internal fun SelectionBar(count: Int, onCancel: () -> Unit, onAdd: () -> Unit) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        shadowElevation = 8.dp,
+    ) {
+        Row(
+            Modifier.fillMaxWidth().navigationBarsPadding().padding(start = 8.dp, end = 20.dp, top = 12.dp, bottom = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(onClick = onCancel) { Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.stop_selecting)) }
+            Column(Modifier.weight(1f).padding(start = 4.dp)) {
+                Text(pluralStringResource(R.plurals.selected_count, count, count), style = MaterialTheme.typography.titleMedium)
+                Text(
+                    stringResource(R.string.selection_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Spacer(Modifier.width(8.dp))
+            Button(onClick = onAdd, enabled = count > 0) { Text(pluralStringResource(R.plurals.add_selected, count, count)) }
         }
     }
 }
