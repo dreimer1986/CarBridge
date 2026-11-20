@@ -7,6 +7,8 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.scaleIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
@@ -47,7 +49,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -427,6 +431,31 @@ fun HomeScreen(model: HomeModel, actions: HomeActions) {
                         },
                         modifier = Modifier.padding(end = 4.dp),
                     )
+                }
+            }
+
+            // Far enough down that getting back to the car copies takes more than a flick
+            val farDown by remember { derivedStateOf { listState.firstVisibleItemIndex > 8 } }
+            AnimatedVisibility(
+                farDown && !searchFocused,
+                // Centred, as the right side is the + buttons' and the letter strip's
+                Modifier.align(Alignment.BottomCenter).padding(
+                    bottom = inner.calculateBottomPadding() + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 16.dp,
+                ),
+                enter = fadeIn() + scaleIn(),
+                exit = fadeOut() + scaleOut(),
+            ) {
+                Surface(
+                    onClick = { scope.launch { listState.animateScrollToItem(0) } },
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    shadowElevation = 3.dp,
+                ) {
+                    Row(Modifier.padding(start = 12.dp, end = 16.dp, top = 10.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Rounded.KeyboardArrowUp, contentDescription = null, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(stringResource(R.string.back_to_top), style = MaterialTheme.typography.labelLarge)
+                    }
                 }
             }
 
