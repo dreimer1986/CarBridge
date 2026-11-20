@@ -1,10 +1,12 @@
 package org.carbridge
 
 import android.app.Application
+import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.net.Uri
 import android.os.storage.StorageManager
 import android.util.Log
+import androidx.annotation.StringRes
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshotFlow
@@ -41,26 +43,28 @@ data class Job(
     val silent: Boolean = false,
 ) {
     /** [waiting] is how many more copies an Update all run will build after this one. */
-    fun headline(waiting: Int) = when {
-        waiting > 0 -> "Updating $label, $waiting more after"
-        update -> "Updating $label"
-        else -> "Adding $label to your car"
+    fun headline(context: Context, waiting: Int): String = when {
+        waiting > 0 -> context.resources.getQuantityString(R.plurals.job_updating_more, waiting, label, waiting)
+        update -> context.getString(R.string.job_updating, label)
+        else -> context.getString(R.string.job_adding, label)
     }
 
     // Updates of copies CarBridge installed often skip the prompt
-    val stepText get() = when {
-        step != JobStep.Confirm.ordinal -> JobStep.entries[step].text
-        update -> "Installing the update"
-        silent -> "Installing the copy"
-        else -> JobStep.Confirm.text
-    }
+    fun stepText(context: Context): String = context.getString(
+        when {
+            step != JobStep.Confirm.ordinal -> JobStep.entries[step].text
+            update -> R.string.step_installing_update
+            silent -> R.string.step_installing
+            else -> JobStep.Confirm.text
+        },
+    )
 }
 
-enum class JobStep(val text: String) {
-    Read("Reading the app"),
-    Patch("Making the car copy"),
-    Sign("Signing it on this phone"),
-    Confirm("Confirm the install in Android's prompt"),
+enum class JobStep(@StringRes val text: Int) {
+    Read(R.string.step_read),
+    Patch(R.string.step_patch),
+    Sign(R.string.step_sign),
+    Confirm(R.string.step_confirm),
 }
 
 data class Setup(val canInstall: Boolean, val developerMode: Boolean, val unknownSources: Boolean) {
@@ -144,7 +148,7 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
             // queued stays above 0 between copies of an Update all run, so the service keeps running
             snapshotFlow { job to queued }.collect { (current, waiting) ->
                 when {
-                    current != null -> PatchService.show(app, current.headline(maxOf(waiting - 1, 0)), current.stepText)
+                    current != null -> PatchService.show(app, current.headline(app, maxOf(waiting - 1, 0)), current.stepText(app))
                     waiting == 0 -> PatchService.stop(app)
                 }
             }
@@ -160,11 +164,9 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
                     }
                     _messages.send(
                         when {
-                            result.success -> UserMessage(
-                                "${current.label} is on your car. Reconnect your phone to Android Auto to see it.",
-                            )
-                            result.cancelled -> UserMessage("Install cancelled.")
-                            else -> UserMessage("Couldn't add ${current.label}.", details(result.message))
+                            result.success -> UserMessage(text(R.string.msg_added, current.label))
+                            result.cancelled -> UserMessage(text(R.string.msg_install_cancelled))
+                            else -> UserMessage(text(R.string.msg_add_failed, current.label), details(result.message))
                         },
                     )
                 }
@@ -280,7 +282,7 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
                 .onSuccess { (file, code) -> newBackup = NewBackup(file, code) }
                 .onFailure { e ->
                     Log.e(TAG, "backup failed", e)
-                    _messages.send(UserMessage("Couldn't make a key backup.", "${e.javaClass.simpleName}: ${e.message}"))
+                    _messages.send(UserMessage(text(R.string.msg_backup_failed), "${e.javaClass.simpleName}: ${e.message}"))
                 }
         }
     }
@@ -303,8 +305,8 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
             }
             backedUp = saved.isSuccess
             _messages.send(
-                if (saved.isSuccess) UserMessage("Key backed up. Keep the file and the code somewhere other than this phone.")
-                else UserMessage("Couldn't save the backup.", saved.exceptionOrNull()?.message),
+                if (saved.isSuccess) UserMessage(text(R.string.msg_backed_up))
+                else UserMessage(text(R.string.msg_backup_save_failed), saved.exceptionOrNull()?.message),
             )
         }
     }
@@ -316,7 +318,7 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
                 runCatching { context.contentResolver.openInputStream(uri)!!.use { it.readBytes() } }
             }
             file.onSuccess { restoreRequest = RestoreRequest(it) }
-                .onFailure { _messages.send(UserMessage("Couldn't open that file.", it.message)) }
+                .onFailure { _messages.send(UserMessage(text(R.string.msg_open_failed), it.message)) }
         }
     }
 
@@ -331,7 +333,7 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
             }
             result.exceptionOrNull()?.let { e ->
                 Log.w(TAG, "restore failed", e)
-                restoreRequest = RestoreRequest(request.file, error = (e as? BackupFailure)?.message ?: "This backup couldn't be restored.")
+                restoreRequest = RestoreRequest(request.file, error = text((e as? BackupFailure)?.reason?.text ?: R.string.backup_restore_failed))
                 return@launch
             }
             restoreRequest = null
@@ -344,10 +346,9 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
             _messages.send(
                 UserMessage(
                     when {
-                        fixed == 1 -> "Key restored. 1 copy can update again."
-                        fixed > 1 -> "Key restored. $fixed copies can update again."
-                        covered > 0 -> "Key restored. It signs your copies' updates from now on."
-                        else -> "Key restored. It doesn't match any copy on this phone, but it will sign new ones."
+                        fixed > 0 -> getApplication<Application>().resources.getQuantityString(R.plurals.msg_restored_fixed, fixed, fixed)
+                        covered > 0 -> text(R.string.msg_restored_covers)
+                        else -> text(R.string.msg_restored_new)
                     },
                 ),
             )
@@ -434,7 +435,7 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
     fun addFromFiles(uris: List<Uri>) {
         if (uris.isEmpty()) return
         if (job != null || backgroundBuild != null) {
-            viewModelScope.launch { _messages.send(UserMessage("CarBridge is making another copy. Open the file again when it's done.")) }
+            viewModelScope.launch { _messages.send(UserMessage(text(R.string.msg_busy_file))) }
             return
         }
         val context = getApplication<Application>()
@@ -462,7 +463,7 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
             read.onFailure { e ->
                 Log.w(TAG, "import failed", e)
                 withContext(Dispatchers.IO) { ApkImport.workDir(context.cacheDir).deleteRecursively() }
-                _messages.send(UserMessage("Couldn't use that file.", details((e as? ImportFailure)?.message ?: CopyBuilder.describe(e))))
+                _messages.send(UserMessage(text(R.string.msg_file_failed), details((e as? ImportFailure)?.message ?: CopyBuilder.describe(e))))
             }
             val (info, label, icon) = read.getOrNull() ?: return@launch
             val installed = runCatching { context.packageManager.getPackageInfo(info.packageName, 0) }.isSuccess
@@ -491,7 +492,7 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
                 Log.e(TAG, "patch failed", e)
                 job = null
                 nextQueued(continueRun = false)
-                _messages.send(UserMessage("Couldn't add $label.", details(CopyBuilder.describe(e))))
+                _messages.send(UserMessage(text(R.string.msg_add_failed, label), details(CopyBuilder.describe(e))))
                 return@launch
             } finally {
                 withContext(Dispatchers.IO) { cleanUp() }
@@ -499,7 +500,7 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
             if (!started) {
                 job = null
                 nextQueued(continueRun = false)
-                _messages.send(UserMessage("CarBridge is updating another copy in the background. Try again in a minute."))
+                _messages.send(UserMessage(text(R.string.msg_busy_background)))
             }
         }
     }
@@ -526,6 +527,8 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
         // The patch runs in viewModelScope, which is cancelled with the model
         PatchService.stop(getApplication())
     }
+
+    private fun text(@StringRes id: Int, vararg args: Any): String = getApplication<Application>().getString(id, *args)
 
     private fun details(error: String?) = synchronized(log) { (log + listOfNotNull(error)).joinToString("\n") }
 }

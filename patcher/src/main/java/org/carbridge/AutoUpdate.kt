@@ -97,7 +97,7 @@ object AutoUpdate {
             if (!CopyBuilder.build(context, app, log = { Log.i(TAG, it) }, background = true)) return true
         } catch (e: Throwable) {
             Log.e(TAG, "background update failed", e)
-            notifyResult(context, next.label, "Couldn't update its car copy. Open CarBridge to try again.", CopyBuilder.describe(e))
+            notifyResult(context, next.label, context.getString(R.string.auto_failed), CopyBuilder.describe(e))
         }
         return pending(context, UpdateCheck.findOutdated(context)).isNotEmpty()
     }
@@ -117,8 +117,8 @@ object AutoUpdate {
         if (context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
         val manager = context.getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(
-            NotificationChannel(CHANNEL, "Automatic copy updates", NotificationManager.IMPORTANCE_LOW).apply {
-                description = "Car copies CarBridge updated on its own, or needs you to finish updating"
+            NotificationChannel(CHANNEL, context.getString(R.string.channel_auto), NotificationManager.IMPORTANCE_LOW).apply {
+                description = context.getString(R.string.channel_auto_desc)
             },
         )
         val open = PendingIntent.getActivity(

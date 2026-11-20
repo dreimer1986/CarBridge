@@ -1,5 +1,6 @@
 package org.carbridge.patch
 
+import androidx.annotation.StringRes
 import com.android.apksig.SigningCertificateLineage
 import java.io.ByteArrayOutputStream
 import java.io.DataInputStream
@@ -16,9 +17,18 @@ import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.PBEKeySpec
 import javax.crypto.spec.SecretKeySpec
+import org.carbridge.R
 
-/** A backup the user can act on; its message is shown as is. */
-class BackupFailure(message: String) : Exception(message)
+/** Why a backup can't be opened; [Reason.text] is what the user sees, the message is for logs. */
+class BackupFailure(val reason: Reason, message: String) : Exception(message) {
+    enum class Reason(@StringRes val text: Int) {
+        NotABackup(R.string.backup_not_backup),
+        Newer(R.string.backup_newer),
+        CodeFormat(R.string.backup_code_format),
+        WrongCodeOrDamaged(R.string.backup_code_wrong),
+        Damaged(R.string.backup_damaged),
+    }
+}
 
 /**
  * The backup signing key, its certificate and the lineage from the phone's Keystore key, sealed
@@ -76,12 +86,12 @@ class KeyBackup(val key: PrivateKey, val cert: X509Certificate, val lineage: Sig
 
         fun open(file: ByteArray, code: String): KeyBackup {
             if (file.size <= HEADER_BYTES || !file.copyOfRange(0, MAGIC.size).contentEquals(MAGIC)) {
-                throw BackupFailure("This isn't a CarBridge key backup.")
+                throw BackupFailure(BackupFailure.Reason.NotABackup, "This isn't a CarBridge key backup.")
             }
             if (file[MAGIC.size] != VERSION) {
-                throw BackupFailure("This backup was made by a newer CarBridge. Update CarBridge, then try again.")
+                throw BackupFailure(BackupFailure.Reason.Newer, "This backup was made by a newer CarBridge.")
             }
-            if (!isWellFormed(code)) throw BackupFailure("A recovery code has 24 letters and digits.")
+            if (!isWellFormed(code)) throw BackupFailure(BackupFailure.Reason.CodeFormat, "A recovery code has 24 letters and digits.")
             val header = file.copyOfRange(0, HEADER_BYTES)
             val salt = header.copyOfRange(MAGIC.size + 1, MAGIC.size + 1 + SALT_BYTES)
             val nonce = header.copyOfRange(HEADER_BYTES - NONCE_BYTES, HEADER_BYTES)
@@ -89,7 +99,7 @@ class KeyBackup(val key: PrivateKey, val cert: X509Certificate, val lineage: Sig
                 cipher(Cipher.DECRYPT_MODE, normalize(code), salt, nonce, header).doFinal(file, HEADER_BYTES, file.size - HEADER_BYTES)
             } catch (e: GeneralSecurityException) {
                 // GCM can't tell a wrong code from a damaged file
-                throw BackupFailure("The recovery code doesn't match this backup, or the file is damaged.")
+                throw BackupFailure(BackupFailure.Reason.WrongCodeOrDamaged, "Wrong recovery code or damaged file.")
             }
             return decodeContents(contents)
         }
@@ -101,7 +111,7 @@ class KeyBackup(val key: PrivateKey, val cert: X509Certificate, val lineage: Sig
             val key = KeyFactory.getInstance("RSA").generatePrivate(PKCS8EncodedKeySpec(keyBytes))
             val cert = CertificateFactory.getInstance("X.509").generateCertificate(certBytes.inputStream()) as X509Certificate
             val lineage = SigningCertificateLineage.readFromBytes(lineageBytes)
-            if (!lineage.isCertificateLatestInLineage(cert)) throw BackupFailure("This backup is damaged: its key doesn't match its history.")
+            if (!lineage.isCertificateLatestInLineage(cert)) throw BackupFailure(BackupFailure.Reason.Damaged, "The key doesn't match its lineage.")
             return KeyBackup(key, cert, lineage)
         }
 

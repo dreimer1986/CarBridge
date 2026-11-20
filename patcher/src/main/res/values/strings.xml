@@ -1,3 +1,223 @@
 <resources>
     <string name="app_name">CarBridge</string>
+
+    <!-- General -->
+    <string name="tagline">Put the apps on your phone on your car\'s screen.</string>
+    <string name="settings">Settings</string>
+    <string name="about_cd">About CarBridge</string>
+    <string name="details">Details</string>
+    <string name="close">Close</string>
+    <string name="cancel">Cancel</string>
+    <string name="details_intro">This app may not support being copied. These details help when reporting a problem:</string>
+
+    <!-- Key cards on the home screen -->
+    <plurals name="restore_card_title">
+        <item quantity="one">%d copy needs your key backup</item>
+        <item quantity="other">%d copies need your key backup</item>
+    </plurals>
+    <string name="restore_card_body">CarBridge was reinstalled or its data cleared, so it can\'t update copies made before. If you saved a key backup, restore it.</string>
+    <string name="restore_backup">Restore backup</string>
+    <string name="restore_none">I don\'t have one</string>
+    <string name="backup_card_title">Back up your CarBridge key</string>
+    <string name="backup_card_body">If CarBridge is reinstalled or its data cleared, your copies can only update again with this backup.</string>
+    <string name="back_up">Back up</string>
+    <string name="later">Later</string>
+
+    <!-- Sections -->
+    <string name="on_your_car">On your car</string>
+    <string name="car_empty">Nothing yet. Add an app below, then reconnect your phone to Android Auto.</string>
+    <string name="add_an_app">Add an app</string>
+    <string name="add_from_file">Add from an APK file</string>
+    <string name="add_empty_all">Every app you can add is already on your car.</string>
+    <string name="add_empty_search">No apps match “%s”.</string>
+    <string name="restore_first_title">Restore your key first?</string>
+    <string name="restore_first_body">Restore your key backup before adding apps, so new copies use the same key as the ones already on your car and one backup covers them all.</string>
+    <string name="add_without_key">Add without it</string>
+
+    <!-- Setup -->
+    <string name="setup_install_title">Let CarBridge install apps</string>
+    <string name="setup_install_body">Android asks once. CarBridge only installs the car copies you choose.</string>
+    <string name="allow">Allow</string>
+    <string name="setup_dev_title">Turn on developer mode in Android Auto</string>
+    <string name="setup_dev_body">Open Android Auto settings and tap Version 10 times until it says developer mode is on.</string>
+    <string name="open_android_auto">Open Android Auto</string>
+    <string name="its_on">It\'s on</string>
+    <string name="setup_unknown_title">Allow unknown sources</string>
+    <string name="setup_unknown_body">In Android Auto settings, open the menu at the top right, choose Developer settings and turn on Unknown sources.</string>
+    <string name="setup_done_title">You\'re set up</string>
+    <string name="setup_title">Set up once</string>
+    <string name="hide_setup">Hide setup</string>
+    <string name="setup_intro">Android Auto only lists apps from outside the Play Store after these three steps.</string>
+    <string name="step_done">Done</string>
+    <string name="setup_complete">Android Auto is set up</string>
+    <string name="setup_steps">Setup steps</string>
+
+    <!-- Car copies -->
+    <string name="open_copy">Open %s</string>
+    <string name="more_for">More for %s</string>
+    <string name="copy_from_file">Made from a file</string>
+    <string name="copy_original_removed">Original removed</string>
+    <string name="copy_other_carbridge">Made by another CarBridge app</string>
+    <string name="copy_restore_key">Restore your key to update it</string>
+    <string name="copy_in_android_auto">In Android Auto</string>
+    <string name="version_build">build %d</string>
+    <string name="update">Update</string>
+    <string name="update_ready">UPDATE READY</string>
+    <string name="menu_open_on_phone">Open on phone</string>
+    <string name="menu_update_from_file">Update from a file</string>
+    <string name="menu_update_copy">Update copy</string>
+    <string name="menu_keep_portrait">Keep portrait layout</string>
+    <string name="menu_fill_screen">Fill the car screen</string>
+    <string name="menu_full_app">Always show the full app</string>
+    <string name="menu_audio_player">Use Android Auto\'s audio player</string>
+    <string name="menu_show_on_phone">Show in phone\'s app list</string>
+    <string name="menu_hide_on_phone">Hide from phone\'s app list</string>
+    <string name="menu_no_auto_update">Don\'t update automatically</string>
+    <string name="menu_auto_update">Update automatically</string>
+    <string name="menu_remove">Remove from car</string>
+    <plurals name="copies_outdated">
+        <item quantity="one">%d copy is out of date</item>
+        <item quantity="other">%d copies are out of date</item>
+    </plurals>
+    <string name="update_all">Update all</string>
+
+    <!-- Apps to add -->
+    <string name="search_apps">Search your apps</string>
+    <string name="clear_search">Clear search</string>
+    <plurals name="auto_apps_showing">
+        <item quantity="one">Showing %d app that already works in Android Auto.</item>
+        <item quantity="other">Showing %d apps that already work in Android Auto.</item>
+    </plurals>
+    <plurals name="auto_apps_hidden">
+        <item quantity="one">%d app already works in Android Auto.</item>
+        <item quantity="other">%d apps already work in Android Auto.</item>
+    </plurals>
+    <string name="hide_them">Hide them</string>
+    <string name="show_them">Show them</string>
+    <string name="copy_protected">Copy protected</string>
+    <string name="patched_with_morphe">Patched with Morphe</string>
+    <string name="has_android_auto">Has Android Auto</string>
+    <string name="add">Add</string>
+
+    <!-- Add dialogs -->
+    <string name="add_title">Add %s</string>
+    <string name="add_choice_intro">You can change these later from the copy\'s ⋮ menu.</string>
+    <string name="choice_fill_title">Fill the car screen</string>
+    <string name="choice_fill_body">Some screens only work upright. Turn off to keep them narrow but unchanged.</string>
+    <string name="choice_player_title">Use Android Auto\'s audio player</string>
+    <string name="choice_player_body">Android Auto shows its own player for this app instead of the full app.</string>
+    <string name="add_to_car">Add to car</string>
+    <string name="morphe_title">Add %s in Morphe instead</string>
+    <string name="morphe_body">%s was patched with Morphe. Add the CarBridge Patches source in Morphe and repatch there: you keep one app with your settings, and it avoids a branding error.</string>
+    <string name="open_in_morphe">Open in Morphe</string>
+    <string name="copy_anyway">Make a copy anyway</string>
+    <string name="license_title">%s probably won\'t open</string>
+    <string name="license_body">%s uses Google Play\'s copy protection, which usually closes copies as soon as they start. You can still try.</string>
+    <string name="add_anyway">Add anyway</string>
+
+    <!-- Footer and About -->
+    <string name="footer_safety">Car copies are for passengers, or for when you\'re parked.</string>
+    <string name="how_it_works">How CarBridge works</string>
+    <string name="about_copy_title">A separate copy</string>
+    <string name="about_copy_body">CarBridge makes a copy of an app that Android Auto will show on the car screen. Your original app and its data stay as they are; the copy has its own data and sign-in.</string>
+    <string name="about_limits_title">Some apps won\'t open</string>
+    <string name="about_limits_body">Apps that check their own signature, a license or Play Integrity may refuse to run as a copy.</string>
+    <string name="about_key_title">Keep your key safe</string>
+    <string name="about_key_body">Copies are signed with a key stored on this phone. Back it up in Settings, so your copies can still update if CarBridge is reinstalled or its data cleared.</string>
+    <string name="about_fair_title">Use it safely and fairly</string>
+    <string name="about_fair_body">Use car copies only while parked or for passengers. Only copy apps whose license allows changes, and don\'t share the copies.</string>
+    <string name="about_free_title">Free software</string>
+    <string name="about_free_body">GPL-3.0. No accounts, ads or tracking. Everything happens on this phone.</string>
+
+    <!-- Progress -->
+    <plurals name="job_updating_more">
+        <item quantity="one">Updating %1$s, %2$d more after</item>
+        <item quantity="other">Updating %1$s, %2$d more after</item>
+    </plurals>
+    <string name="job_updating">Updating %s</string>
+    <string name="job_adding">Adding %s to your car</string>
+    <string name="step_read">Reading the app</string>
+    <string name="step_patch">Making the car copy</string>
+    <string name="step_sign">Signing it on this phone</string>
+    <string name="step_confirm">Confirm the install in Android\'s prompt</string>
+    <string name="step_installing_update">Installing the update</string>
+    <string name="step_installing">Installing the copy</string>
+    <string name="background_update">Updating %s\'s car copy in the background</string>
+
+    <!-- Settings -->
+    <string name="auto_update_title">Update copies automatically</string>
+    <string name="auto_update_body">When an app updates, CarBridge updates its car copy the next time your phone charges.</string>
+    <string name="key_title">Your CarBridge key</string>
+    <string name="key_backed_up">Backed up.</string>
+    <string name="key_not_backed_up">Not backed up yet.</string>
+    <string name="key_body">If CarBridge is reinstalled or its data cleared, your copies can only update again with a key backup. Keep the file and its code off this phone.</string>
+    <string name="back_up_again">Back up again</string>
+    <string name="back_up_key">Back up key</string>
+    <string name="shizuku_title">Install with Shizuku</string>
+    <string name="shizuku_what">Copies install without asking, even the first time, and get the permissions the original app has.</string>
+    <string name="shizuku_not_installed">For advanced users: needs the Shizuku app.</string>
+    <string name="shizuku_not_running">Shizuku isn\'t running. Start it in the Shizuku app; after a restart of your phone it must be started again.</string>
+    <string name="shizuku_until_then">Until then, CarBridge asks before installing as usual.</string>
+    <string name="shizuku_needs_permission">Shizuku is running. Allow CarBridge to use it.</string>
+    <string name="get_shizuku">Get Shizuku</string>
+    <string name="open_shizuku">Open Shizuku</string>
+    <string name="allow_carbridge">Allow CarBridge</string>
+
+    <!-- Key backup and restore -->
+    <string name="code_title">Save your recovery code</string>
+    <string name="code_body">You need this code and the backup file to restore your key. CarBridge shows it only once.</string>
+    <string name="copy_code">Copy code</string>
+    <string name="code_saved">I\'ve written down or saved the code</string>
+    <string name="save_backup_file">Save backup file</string>
+    <string name="code_clip_label">CarBridge recovery code</string>
+    <string name="restore_title">Restore your key</string>
+    <string name="restore_prompt">Enter the recovery code you saved with this backup.</string>
+    <string name="restore">Restore</string>
+    <string name="backup_not_backup">This isn\'t a CarBridge key backup.</string>
+    <string name="backup_newer">This backup was made by a newer CarBridge. Update CarBridge, then try again.</string>
+    <string name="backup_code_format">A recovery code has 24 letters and digits.</string>
+    <string name="backup_code_wrong">The recovery code doesn\'t match this backup, or the file is damaged.</string>
+    <string name="backup_damaged">This backup is damaged: its key doesn\'t match its history.</string>
+    <string name="backup_restore_failed">This backup couldn\'t be restored.</string>
+
+    <!-- Messages -->
+    <string name="msg_added">%s is on your car. Reconnect your phone to Android Auto to see it.</string>
+    <string name="msg_install_cancelled">Install cancelled.</string>
+    <string name="msg_add_failed">Couldn\'t add %s.</string>
+    <string name="msg_backup_failed">Couldn\'t make a key backup.</string>
+    <string name="msg_backed_up">Key backed up. Keep the file and the code somewhere other than this phone.</string>
+    <string name="msg_backup_save_failed">Couldn\'t save the backup.</string>
+    <string name="msg_open_failed">Couldn\'t open that file.</string>
+    <plurals name="msg_restored_fixed">
+        <item quantity="one">Key restored. %d copy can update again.</item>
+        <item quantity="other">Key restored. %d copies can update again.</item>
+    </plurals>
+    <string name="msg_restored_covers">Key restored. It signs your copies\' updates from now on.</string>
+    <string name="msg_restored_new">Key restored. It doesn\'t match any copy on this phone, but it will sign new ones.</string>
+    <string name="msg_busy_file">CarBridge is making another copy. Open the file again when it\'s done.</string>
+    <string name="msg_file_failed">Couldn\'t use that file.</string>
+    <string name="msg_busy_background">CarBridge is updating another copy in the background. Try again in a minute.</string>
+
+    <!-- Notifications -->
+    <string name="channel_updates">Car copy updates</string>
+    <string name="channel_updates_desc">When an app is updated and its car copy should be updated to match</string>
+    <string name="notif_one_title">%s was updated</string>
+    <plurals name="notif_many_title">
+        <item quantity="one">%d car copy is out of date</item>
+        <item quantity="other">%d car copies are out of date</item>
+    </plurals>
+    <string name="notif_one_text">Update its car copy in CarBridge so they match.</string>
+    <string name="notif_many_text">%s. Update them in CarBridge.</string>
+    <string name="action_always_auto">Always update automatically</string>
+    <string name="auto_on_title">Automatic updates are on</string>
+    <string name="auto_on_text">Car copies will update while your phone charges.</string>
+    <string name="channel_auto">Automatic copy updates</string>
+    <string name="channel_auto_desc">Car copies CarBridge updated on its own, or needs you to finish updating</string>
+    <string name="auto_failed">Couldn\'t update its car copy. Open CarBridge to try again.</string>
+    <string name="auto_confirm">Android needs you to confirm its car copy update. Tap to finish.</string>
+    <string name="auto_updated_to">Car copy updated to %s.</string>
+    <string name="auto_updated">Car copy updated.</string>
+    <string name="patch_default_title">Making a car copy</string>
+    <string name="channel_patching">Making car copies</string>
+    <string name="channel_patching_desc">Progress while CarBridge makes or updates a car copy</string>
 </resources>

@@ -61,7 +61,7 @@ class KeyBackupTest {
     @Test
     fun rejectsOtherFiles() {
         val failure = assertThrows(BackupFailure::class.java) { KeyBackup.open("hello".toByteArray(), KeyBackup.newRecoveryCode()) }
-        assertEquals("This isn't a CarBridge key backup.", failure.message)
+        assertEquals(BackupFailure.Reason.NotABackup, failure.reason)
     }
 
     private fun keyPair() = KeyPairGenerator.getInstance("RSA").apply { initialize(2048) }.generateKeyPair()

@@ -98,15 +98,19 @@ object UpdateCheck {
         }
         val manager = context.getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(
-            NotificationChannel(CHANNEL, "Car copy updates", NotificationManager.IMPORTANCE_DEFAULT).apply {
-                description = "When an app is updated and its car copy should be updated to match"
+            NotificationChannel(CHANNEL, context.getString(R.string.channel_updates), NotificationManager.IMPORTANCE_DEFAULT).apply {
+                description = context.getString(R.string.channel_updates_desc)
             },
         )
-        val title = if (outdated.size == 1) "${outdated[0].label} was updated" else "${outdated.size} car copies are out of date"
-        val text = if (outdated.size == 1) {
-            "Update its car copy in CarBridge so they match."
+        val title = if (outdated.size == 1) {
+            context.getString(R.string.notif_one_title, outdated[0].label)
         } else {
-            outdated.joinToString { it.label } + ". Update them in CarBridge."
+            context.resources.getQuantityString(R.plurals.notif_many_title, outdated.size, outdated.size)
+        }
+        val text = if (outdated.size == 1) {
+            context.getString(R.string.notif_one_text)
+        } else {
+            context.getString(R.string.notif_many_text, outdated.joinToString { it.label })
         }
         val open = PendingIntent.getActivity(
             context, 0,
@@ -121,7 +125,7 @@ object UpdateCheck {
             context, 1, updateIntent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
-        val updateLabel = if (outdated.size == 1) "Update" else "Update all"
+        val updateLabel = context.getString(if (outdated.size == 1) R.string.update else R.string.update_all)
         val builder = Notification.Builder(context, CHANNEL)
             .addAction(Notification.Action.Builder(null, updateLabel, update).build())
             .setSmallIcon(R.drawable.ic_notification)
@@ -135,7 +139,7 @@ object UpdateCheck {
                 val optIn = PendingIntent.getBroadcast(
                     context, 4, Intent(context, AutoUpdateOptInReceiver::class.java), PendingIntent.FLAG_IMMUTABLE,
                 )
-                addAction(Notification.Action.Builder(null, "Always update automatically", optIn).build())
+                addAction(Notification.Action.Builder(null, context.getString(R.string.action_always_auto), optIn).build())
             }
         }.build()
         manager.notify(NOTIFICATION_ID, notification)
@@ -160,6 +164,6 @@ class AutoUpdateOptInReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         AutoUpdate.setEnabled(context, true)
         UpdateCheck.dismiss(context)
-        AutoUpdate.notifyResult(context, "Automatic updates are on", "Car copies will update while your phone charges.")
+        AutoUpdate.notifyResult(context, context.getString(R.string.auto_on_title), context.getString(R.string.auto_on_text))
     }
 }

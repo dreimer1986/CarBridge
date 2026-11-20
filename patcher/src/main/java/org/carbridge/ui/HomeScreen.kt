@@ -109,6 +109,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -124,6 +126,7 @@ import org.carbridge.AddChoice
 import org.carbridge.CarCopy
 import org.carbridge.Caution
 import org.carbridge.HomeModel
+import org.carbridge.R
 import org.carbridge.Job
 import org.carbridge.JobStep
 import org.carbridge.RestoreRequest
@@ -177,11 +180,12 @@ fun HomeScreen(model: HomeModel, actions: HomeActions) {
     var restoreFirstFor by remember { mutableStateOf<SourceApp?>(null) }
     var backupLater by rememberSaveable { mutableStateOf(false) }
 
+    val detailsLabel = stringResource(R.string.details)
     LaunchedEffect(model) {
         model.messages.collect { message ->
             val result = snackbar.showSnackbar(
                 message.text,
-                actionLabel = if (message.details != null) "Details" else null,
+                actionLabel = if (message.details != null) detailsLabel else null,
                 withDismissAction = message.details == null,
                 duration = SnackbarDuration.Long,
             )
@@ -244,34 +248,32 @@ fun HomeScreen(model: HomeModel, actions: HomeActions) {
                 if (offerRestore) {
                     item("restore") {
                         KeyCard(
-                            title = if (lost == 1) "1 copy needs your key backup" else "$lost copies need your key backup",
-                            body = "CarBridge was reinstalled or its data cleared, so it can't update copies made before. " +
-                                "If you saved a key backup, restore it.",
-                            action = "Restore backup",
+                            title = pluralStringResource(R.plurals.restore_card_title, lost, lost),
+                            body = stringResource(R.string.restore_card_body),
+                            action = stringResource(R.string.restore_backup),
                             onAction = actions.pickBackup,
-                            other = "I don't have one",
+                            other = stringResource(R.string.restore_none),
                             onOther = model::declineRestore,
                         )
                     }
                 } else if (catalog != null && catalog.copies.any { !it.signedElsewhere } && !model.backedUp && !backupLater) {
                     item("backup") {
                         KeyCard(
-                            title = "Back up your CarBridge key",
-                            body = "If CarBridge is reinstalled or its data cleared, your copies can only update again " +
-                                "with this backup.",
-                            action = "Back up",
+                            title = stringResource(R.string.backup_card_title),
+                            body = stringResource(R.string.backup_card_body),
+                            action = stringResource(R.string.back_up),
                             onAction = model::startBackup,
-                            other = "Later",
+                            other = stringResource(R.string.later),
                             onOther = { backupLater = true },
                         )
                     }
                 }
 
-                item("car-title") { SectionTitle("On your car") }
+                item("car-title") { SectionTitle(stringResource(R.string.on_your_car)) }
                 when {
                     catalog == null -> item("loading") { Loading() }
                     catalog.copies.isEmpty() -> item("car-empty") {
-                        Hint("Nothing yet. Add an app below, then reconnect your phone to Android Auto.")
+                        Hint(stringResource(R.string.car_empty))
                     }
                     else -> {
                         val outdated = catalog.copies.filter { it.outdated && it.updatable }
@@ -295,13 +297,13 @@ fun HomeScreen(model: HomeModel, actions: HomeActions) {
                     }
                 }
 
-                item("add-title") { SectionTitle("Add an app") }
+                item("add-title") { SectionTitle(stringResource(R.string.add_an_app)) }
                 item("add-file") {
                     OutlinedButton(
                         onClick = { actions.pickApks(null) },
                         enabled = !busy,
                         modifier = Modifier.padding(start = Gutter, end = Gutter, bottom = 12.dp),
-                    ) { Text("Add from an APK file") }
+                    ) { Text(stringResource(R.string.add_from_file)) }
                 }
                 if (catalog != null) {
                     if (catalog.available.size > 6) {
@@ -313,7 +315,7 @@ fun HomeScreen(model: HomeModel, actions: HomeActions) {
                     }
                     if (shown.isEmpty()) {
                         item("add-empty") {
-                            Hint(if (search.isEmpty()) "Every app you can add is already on your car." else "No apps match “$search”.")
+                            Hint(if (search.isEmpty()) stringResource(R.string.add_empty_all) else stringResource(R.string.add_empty_search, search))
                         }
                     }
                     items(shown, key = { "src:" + it.info.packageName }) { app ->
@@ -389,15 +391,12 @@ fun HomeScreen(model: HomeModel, actions: HomeActions) {
     restoreFirstFor?.let { app ->
         AlertDialog(
             onDismissRequest = { restoreFirstFor = null },
-            title = { Text("Restore your key first?") },
-            text = {
-                Text(
-                    "Restore your key backup before adding apps, so new copies use the same key as the ones " +
-                        "already on your car and one backup covers them all.",
-                )
+            title = { Text(stringResource(R.string.restore_first_title)) },
+            text = { Text(stringResource(R.string.restore_first_body)) },
+            confirmButton = {
+                TextButton(onClick = { restoreFirstFor = null; actions.pickBackup() }) { Text(stringResource(R.string.restore_backup)) }
             },
-            confirmButton = { TextButton(onClick = { restoreFirstFor = null; actions.pickBackup() }) { Text("Restore backup") } },
-            dismissButton = { TextButton(onClick = { restoreFirstFor = null; addApp(app) }) { Text("Add without it") } },
+            dismissButton = { TextButton(onClick = { restoreFirstFor = null; addApp(app) }) { Text(stringResource(R.string.add_without_key)) } },
         )
     }
     model.newBackup?.let { backup ->
@@ -431,12 +430,12 @@ fun HomeScreen(model: HomeModel, actions: HomeActions) {
     details?.let { message ->
         AlertDialog(
             onDismissRequest = { details = null },
-            confirmButton = { TextButton(onClick = { details = null }) { Text("Close") } },
+            confirmButton = { TextButton(onClick = { details = null }) { Text(stringResource(R.string.close)) } },
             title = { Text(message.text) },
             text = {
                 Column(Modifier.verticalScroll(rememberScrollState())) {
                     Text(
-                        "This app may not support being copied. These details help when reporting a problem:",
+                        stringResource(R.string.details_intro),
                         style = MaterialTheme.typography.bodyMedium,
                     )
                     Spacer(Modifier.height(12.dp))
@@ -472,21 +471,21 @@ private fun SignHeader(onSettings: () -> Unit, onAbout: () -> Unit) {
             Icon(BridgeMark, contentDescription = null, tint = signs.onGuide, modifier = Modifier.size(40.dp))
             Spacer(Modifier.width(10.dp))
             Text(
-                "CarBridge",
+                stringResource(R.string.app_name),
                 style = MaterialTheme.typography.displaySmall,
                 color = signs.onGuide,
                 modifier = Modifier.weight(1f).semantics { heading() },
             )
             IconButton(onClick = onSettings) {
-                Icon(Icons.Rounded.Settings, contentDescription = "Settings", tint = signs.onGuide)
+                Icon(Icons.Rounded.Settings, contentDescription = stringResource(R.string.settings), tint = signs.onGuide)
             }
             IconButton(onClick = onAbout) {
-                Icon(Icons.Rounded.Info, contentDescription = "About CarBridge", tint = signs.onGuide)
+                Icon(Icons.Rounded.Info, contentDescription = stringResource(R.string.about_cd), tint = signs.onGuide)
             }
         }
         Spacer(Modifier.height(6.dp))
         Text(
-            "Put the apps on your phone on your car's screen.",
+            stringResource(R.string.tagline),
             style = MaterialTheme.typography.titleMedium,
             color = signs.onGuideMuted,
             modifier = Modifier.padding(end = Gutter),
@@ -525,28 +524,28 @@ private fun SetupCard(setup: Setup, actions: HomeActions, onHide: (() -> Unit)?)
     val signs = LocalSigns.current
     val steps = listOf(
         SetupStep(
-            "Let CarBridge install apps",
-            "Android asks once. CarBridge only installs the car copies you choose.",
+            stringResource(R.string.setup_install_title),
+            stringResource(R.string.setup_install_body),
             setup.canInstall,
-        ) { Button(onClick = actions.allowInstalls, colors = cautionButton()) { Text("Allow") } },
+        ) { Button(onClick = actions.allowInstalls, colors = cautionButton()) { Text(stringResource(R.string.allow)) } },
         SetupStep(
-            "Turn on developer mode in Android Auto",
-            "Open Android Auto settings and tap Version 10 times until it says developer mode is on.",
+            stringResource(R.string.setup_dev_title),
+            stringResource(R.string.setup_dev_body),
             setup.developerMode,
         ) {
-            Button(onClick = actions.openAndroidAuto, colors = cautionButton()) { Text("Open Android Auto") }
+            Button(onClick = actions.openAndroidAuto, colors = cautionButton()) { Text(stringResource(R.string.open_android_auto)) }
             TextButton(onClick = actions.markDeveloperMode, colors = ButtonDefaults.textButtonColors(contentColor = signs.onCaution)) {
-                Text("It's on")
+                Text(stringResource(R.string.its_on))
             }
         },
         SetupStep(
-            "Allow unknown sources",
-            "In Android Auto settings, open the menu at the top right, choose Developer settings and turn on Unknown sources.",
+            stringResource(R.string.setup_unknown_title),
+            stringResource(R.string.setup_unknown_body),
             setup.unknownSources,
         ) {
-            Button(onClick = actions.openAndroidAuto, colors = cautionButton()) { Text("Open Android Auto") }
+            Button(onClick = actions.openAndroidAuto, colors = cautionButton()) { Text(stringResource(R.string.open_android_auto)) }
             TextButton(onClick = actions.markUnknownSources, colors = ButtonDefaults.textButtonColors(contentColor = signs.onCaution)) {
-                Text("It's on")
+                Text(stringResource(R.string.its_on))
             }
         },
     )
@@ -561,16 +560,16 @@ private fun SetupCard(setup: Setup, actions: HomeActions, onHide: (() -> Unit)?)
         Column(Modifier.padding(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    if (current == -1) "You're set up" else "Set up once",
+                    stringResource(if (current == -1) R.string.setup_done_title else R.string.setup_title),
                     style = MaterialTheme.typography.headlineSmall,
                     modifier = Modifier.weight(1f).semantics { heading() },
                 )
                 if (onHide != null) {
-                    IconButton(onClick = onHide) { Icon(Icons.Rounded.Close, contentDescription = "Hide setup") }
+                    IconButton(onClick = onHide) { Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.hide_setup)) }
                 }
             }
             Text(
-                "Android Auto only lists apps from outside the Play Store after these three steps.",
+                stringResource(R.string.setup_intro),
                 style = MaterialTheme.typography.bodyMedium,
                 color = signs.onCautionMuted,
                 modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
@@ -604,7 +603,7 @@ private fun StepRow(number: Int, step: SetupStep, active: Boolean) {
             contentAlignment = Alignment.Center,
         ) {
             if (step.done) {
-                Icon(Icons.Rounded.Check, contentDescription = "Done", tint = signs.caution, modifier = Modifier.size(20.dp))
+                Icon(Icons.Rounded.Check, contentDescription = stringResource(R.string.step_done), tint = signs.caution, modifier = Modifier.size(20.dp))
             } else {
                 Text("$number", style = MaterialTheme.typography.titleMedium)
             }
@@ -632,8 +631,8 @@ private fun SetupDone(onShow: () -> Unit) {
     ) {
         Icon(Icons.Rounded.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
         Spacer(Modifier.width(8.dp))
-        Text("Android Auto is set up", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
-        TextButton(onClick = onShow) { Text("Setup steps") }
+        Text(stringResource(R.string.setup_complete), style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+        TextButton(onClick = onShow) { Text(stringResource(R.string.setup_steps)) }
     }
 }
 
@@ -659,7 +658,7 @@ private fun CarSign(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 // Opening on the phone is how users sign in to a copy, which starts with no data
                 Row(
-                    Modifier.weight(1f).clickable(enabled = !busy, onClickLabel = "Open ${copy.label}", onClick = onOpen),
+                    Modifier.weight(1f).clickable(enabled = !busy, onClickLabel = stringResource(R.string.open_copy, copy.label), onClick = onOpen),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     AppIcon(copy.icon, 40)
@@ -668,13 +667,13 @@ private fun CarSign(
                         Text(copy.label, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(
                             when {
-                                copy.fromFile -> listOfNotNull("Made from a file", copy.version?.name).joinToString(" · ")
-                                copy.original == null -> "Original removed"
-                                copy.madeByOtherCarBridge -> "Made by another CarBridge app"
-                                copy.signedElsewhere -> "Restore your key to update it"
+                                copy.fromFile -> listOfNotNull(stringResource(R.string.copy_from_file), copy.version?.name).joinToString(" · ")
+                                copy.original == null -> stringResource(R.string.copy_original_removed)
+                                copy.madeByOtherCarBridge -> stringResource(R.string.copy_other_carbridge)
+                                copy.signedElsewhere -> stringResource(R.string.copy_restore_key)
                                 copy.outdated -> "${versionText(copy.version!!, copy.originalVersion!!)} → " +
                                     versionText(copy.originalVersion, copy.version)
-                                else -> copy.version?.name ?: "In Android Auto"
+                                else -> copy.version?.name ?: stringResource(R.string.copy_in_android_auto)
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = signs.onGuideMuted,
@@ -689,35 +688,35 @@ private fun CarSign(
                         enabled = !busy,
                         colors = ButtonDefaults.buttonColors(containerColor = signs.caution, contentColor = signs.onCaution),
                         contentPadding = PaddingValues(horizontal = 16.dp),
-                    ) { Text("Update") }
+                    ) { Text(stringResource(R.string.update)) }
                 }
                 Box {
                     IconButton(onClick = { menu = true }, enabled = !busy) {
-                        Icon(Icons.Rounded.MoreVert, contentDescription = "More for ${copy.label}", tint = signs.onGuide)
+                        Icon(Icons.Rounded.MoreVert, contentDescription = stringResource(R.string.more_for, copy.label), tint = signs.onGuide)
                     }
                     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                         DropdownMenuItem(
-                            text = { Text("Open on phone") },
+                            text = { Text(stringResource(R.string.menu_open_on_phone)) },
                             leadingIcon = { Icon(Icons.Rounded.Phone, contentDescription = null) },
                             onClick = { menu = false; onOpen() },
                         )
                         if (copy.fromFile && !copy.signedElsewhere) {
                             DropdownMenuItem(
-                                text = { Text("Update from a file") },
+                                text = { Text(stringResource(R.string.menu_update_from_file)) },
                                 leadingIcon = { Icon(Icons.Rounded.Refresh, contentDescription = null) },
                                 onClick = { menu = false; onUpdateFromFile() },
                             )
                         }
                         if (copy.updatable) {
                             DropdownMenuItem(
-                                text = { Text("Update copy") },
+                                text = { Text(stringResource(R.string.menu_update_copy)) },
                                 leadingIcon = { Icon(Icons.Rounded.Refresh, contentDescription = null) },
                                 onClick = { menu = false; onUpdate() },
                             )
                         }
                         if (copy.updatable && copy.portraitLocked) {
                             DropdownMenuItem(
-                                text = { Text(if (copy.options.fillScreen) "Keep portrait layout" else "Fill the car screen") },
+                                text = { Text(stringResource(if (copy.options.fillScreen) R.string.menu_keep_portrait else R.string.menu_fill_screen)) },
                                 leadingIcon = { Icon(LandscapeGlyph, contentDescription = null) },
                                 onClick = { menu = false; onFillScreen(!copy.options.fillScreen) },
                             )
@@ -726,7 +725,7 @@ private fun CarSign(
                             val keep = copy.options.keepMediaServices
                             DropdownMenuItem(
                                 // Kept media services let Android Auto show its audio player for the copy
-                                text = { Text(if (keep) "Always show the full app" else "Use Android Auto's audio player") },
+                                text = { Text(stringResource(if (keep) R.string.menu_full_app else R.string.menu_audio_player)) },
                                 leadingIcon = { Icon(Icons.Rounded.PlayArrow, contentDescription = null) },
                                 onClick = { menu = false; onKeepMedia(!keep) },
                             )
@@ -734,7 +733,7 @@ private fun CarSign(
                         if (copy.updatable) {
                             val hidden = copy.options.hideOnPhone
                             DropdownMenuItem(
-                                text = { Text(if (hidden) "Show in phone's app list" else "Hide from phone's app list") },
+                                text = { Text(stringResource(if (hidden) R.string.menu_show_on_phone else R.string.menu_hide_on_phone)) },
                                 leadingIcon = { Icon(Icons.Rounded.Phone, contentDescription = null) },
                                 onClick = { menu = false; onHideOnPhone(!hidden) },
                             )
@@ -742,13 +741,13 @@ private fun CarSign(
                         if (copy.updatable && onAutoUpdate != null) {
                             val allowed = copy.autoUpdateAllowed
                             DropdownMenuItem(
-                                text = { Text(if (allowed) "Don't update automatically" else "Update automatically") },
+                                text = { Text(stringResource(if (allowed) R.string.menu_no_auto_update else R.string.menu_auto_update)) },
                                 leadingIcon = { Icon(Icons.Rounded.Refresh, contentDescription = null) },
                                 onClick = { menu = false; onAutoUpdate(!allowed) },
                             )
                         }
                         DropdownMenuItem(
-                            text = { Text("Remove from car") },
+                            text = { Text(stringResource(R.string.menu_remove)) },
                             leadingIcon = { Icon(Icons.Rounded.Delete, contentDescription = null) },
                             onClick = { menu = false; onRemove() },
                         )
@@ -770,7 +769,7 @@ private fun UpdateTab() {
         contentColor = signs.onCaution,
     ) {
         Text(
-            "UPDATE READY",
+            stringResource(R.string.update_ready),
             style = MaterialTheme.typography.labelLarge,
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
         )
@@ -778,8 +777,9 @@ private fun UpdateTab() {
 }
 
 /** Version name, or the build number when both sides share a name (e.g. a same-name rebuild). */
+@Composable
 private fun versionText(version: Version, other: Version): String =
-    version.name?.takeIf { it != other.name } ?: "build ${version.code}"
+    version.name?.takeIf { it != other.name } ?: stringResource(R.string.version_build, version.code)
 
 @Composable
 private fun AppIcon(icon: ImageBitmap, sizeDp: Int) {
@@ -791,10 +791,10 @@ private fun SearchField(query: String, onChange: (String) -> Unit) {
     TextField(
         value = query,
         onValueChange = onChange,
-        placeholder = { Text("Search your apps") },
+        placeholder = { Text(stringResource(R.string.search_apps)) },
         leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
         trailingIcon = if (query.isNotEmpty()) {
-            { IconButton(onClick = { onChange("") }) { Icon(Icons.Rounded.Close, contentDescription = "Clear search") } }
+            { IconButton(onClick = { onChange("") }) { Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.clear_search)) } }
         } else null,
         singleLine = true,
         shape = CircleShape,
@@ -811,18 +811,17 @@ private fun SearchField(query: String, onChange: (String) -> Unit) {
 
 @Composable
 private fun AutoAppsToggle(count: Int, showing: Boolean, onToggle: () -> Unit) {
-    val apps = if (count == 1) "1 app" else "$count apps"
     Row(
         Modifier.fillMaxWidth().padding(start = Gutter, end = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            if (showing) "Showing $apps that already work in Android Auto." else "$apps already work in Android Auto.",
+            pluralStringResource(if (showing) R.plurals.auto_apps_showing else R.plurals.auto_apps_hidden, count, count),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.weight(1f),
         )
-        TextButton(onClick = onToggle) { Text(if (showing) "Hide them" else "Show them") }
+        TextButton(onClick = onToggle) { Text(stringResource(if (showing) R.string.hide_them else R.string.show_them)) }
     }
 }
 
@@ -840,11 +839,11 @@ private fun SourceRow(app: SourceApp, enabled: Boolean, endPadding: Dp, onAdd: (
             Text(
                 listOfNotNull(
                     when (app.caution) {
-                        Caution.LicenseCheck -> "Copy protected"
-                        Caution.Morphe -> "Patched with Morphe"
+                        Caution.LicenseCheck -> stringResource(R.string.copy_protected)
+                        Caution.Morphe -> stringResource(R.string.patched_with_morphe)
                         null -> null
                     },
-                    "Has Android Auto".takeIf { app.hasAndroidAuto },
+                    stringResource(R.string.has_android_auto).takeIf { app.hasAndroidAuto },
                     Formatter.formatShortFileSize(context, app.sizeBytes),
                 ).joinToString(" · "),
                 style = MaterialTheme.typography.bodySmall,
@@ -855,7 +854,7 @@ private fun SourceRow(app: SourceApp, enabled: Boolean, endPadding: Dp, onAdd: (
         FilledTonalButton(onClick = onAdd, enabled = enabled, contentPadding = ButtonDefaults.ButtonWithIconContentPadding) {
             Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(6.dp))
-            Text("Add")
+            Text(stringResource(R.string.add))
         }
     }
 }
@@ -867,12 +866,12 @@ private fun UpdateAllRow(count: Int, enabled: Boolean, onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            "$count copies are out of date",
+            pluralStringResource(R.plurals.copies_outdated, count, count),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.weight(1f),
         )
-        FilledTonalButton(onClick = onClick, enabled = enabled) { Text("Update all") }
+        FilledTonalButton(onClick = onClick, enabled = enabled) { Text(stringResource(R.string.update_all)) }
     }
 }
 
@@ -882,25 +881,25 @@ private fun AddChoiceDialog(choice: AddChoice, onConfirm: (CarOptions) -> Unit, 
     var player by rememberSaveable { mutableStateOf(false) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Add ${choice.app.label}") },
+        title = { Text(stringResource(R.string.add_title, choice.app.label)) },
         text = {
             Column {
                 Text(
-                    "You can change these later from the copy's ⋮ menu.",
+                    stringResource(R.string.add_choice_intro),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 if (choice.portraitLocked) {
                     ChoiceRow(
-                        "Fill the car screen",
-                        "Some screens only work upright. Turn off to keep them narrow but unchanged.",
+                        stringResource(R.string.choice_fill_title),
+                        stringResource(R.string.choice_fill_body),
                         fill,
                     ) { fill = it }
                 }
                 if (choice.hasMediaService) {
                     ChoiceRow(
-                        "Use Android Auto's audio player",
-                        "Android Auto shows its own player for this app instead of the full app.",
+                        stringResource(R.string.choice_player_title),
+                        stringResource(R.string.choice_player_body),
                         player,
                     ) { player = it }
                 }
@@ -908,10 +907,10 @@ private fun AddChoiceDialog(choice: AddChoice, onConfirm: (CarOptions) -> Unit, 
         },
         confirmButton = {
             TextButton(onClick = { onConfirm(CarOptions(keepMediaServices = player, fillScreen = fill)) }) {
-                Text("Add to car")
+                Text(stringResource(R.string.add_to_car))
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
     )
 }
 
@@ -935,27 +934,17 @@ private fun CautionDialog(app: SourceApp, onDismiss: () -> Unit, onAddAnyway: ()
     when (app.caution) {
         Caution.Morphe -> AlertDialog(
             onDismissRequest = onDismiss,
-            title = { Text("Add ${app.label} in Morphe instead") },
-            text = {
-                Text(
-                    "${app.label} was patched with Morphe. Add the CarBridge Patches source in Morphe and " +
-                        "repatch there: you keep one app with your settings, and it avoids a branding error.",
-                )
-            },
-            confirmButton = { TextButton(onClick = onOpenMorphe) { Text("Open in Morphe") } },
-            dismissButton = { TextButton(onClick = onAddAnyway) { Text("Make a copy anyway") } },
+            title = { Text(stringResource(R.string.morphe_title, app.label)) },
+            text = { Text(stringResource(R.string.morphe_body, app.label)) },
+            confirmButton = { TextButton(onClick = onOpenMorphe) { Text(stringResource(R.string.open_in_morphe)) } },
+            dismissButton = { TextButton(onClick = onAddAnyway) { Text(stringResource(R.string.copy_anyway)) } },
         )
         Caution.LicenseCheck -> AlertDialog(
             onDismissRequest = onDismiss,
-            title = { Text("${app.label} probably won't open") },
-            text = {
-                Text(
-                    "${app.label} uses Google Play's copy protection, which usually closes copies as soon " +
-                        "as they start. You can still try.",
-                )
-            },
-            confirmButton = { TextButton(onClick = onAddAnyway) { Text("Add anyway") } },
-            dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+            title = { Text(stringResource(R.string.license_title, app.label)) },
+            text = { Text(stringResource(R.string.license_body, app.label)) },
+            confirmButton = { TextButton(onClick = onAddAnyway) { Text(stringResource(R.string.add_anyway)) } },
+            dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
         )
         null -> Unit
     }
@@ -965,11 +954,11 @@ private fun CautionDialog(app: SourceApp, onDismiss: () -> Unit, onAddAnyway: ()
 private fun Footer(onAbout: () -> Unit) {
     Column(Modifier.fillMaxWidth().padding(start = Gutter, end = Gutter, top = 32.dp)) {
         Text(
-            "Car copies are for passengers, or for when you're parked.",
+            stringResource(R.string.footer_safety),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        OutlinedButton(onClick = onAbout, modifier = Modifier.padding(top = 12.dp)) { Text("How CarBridge works") }
+        OutlinedButton(onClick = onAbout, modifier = Modifier.padding(top = 12.dp)) { Text(stringResource(R.string.how_it_works)) }
     }
 }
 
@@ -986,13 +975,13 @@ private fun JobBar(job: Job, waiting: Int) {
                 Spacer(Modifier.width(14.dp))
                 Column(Modifier.weight(1f)) {
                     Text(
-                        job.headline(waiting),
+                        job.headline(LocalContext.current, waiting),
                         style = MaterialTheme.typography.titleMedium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
-                        job.stepText,
+                        job.stepText(LocalContext.current),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -1017,7 +1006,7 @@ private fun BackgroundBar(label: String) {
             CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 3.dp)
             Spacer(Modifier.width(14.dp))
             Text(
-                "Updating $label's car copy in the background",
+                stringResource(R.string.background_update, label),
                 style = MaterialTheme.typography.titleMedium,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
@@ -1060,30 +1049,12 @@ private fun About() {
             .padding(start = 24.dp, end = 24.dp, bottom = 32.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
-        Text("How CarBridge works", style = MaterialTheme.typography.headlineSmall)
-        AboutItem(
-            "A separate copy",
-            "CarBridge makes a copy of an app that Android Auto will show on the car screen. " +
-                "Your original app and its data stay as they are; the copy has its own data and sign-in.",
-        )
-        AboutItem(
-            "Some apps won't open",
-            "Apps that check their own signature, a license or Play Integrity may refuse to run as a copy.",
-        )
-        AboutItem(
-            "Keep your key safe",
-            "Copies are signed with a key stored on this phone. Back it up in Settings, so your copies can " +
-                "still update if CarBridge is reinstalled or its data cleared.",
-        )
-        AboutItem(
-            "Use it safely and fairly",
-            "Use car copies only while parked or for passengers. Only copy apps whose license allows changes, " +
-                "and don't share the copies.",
-        )
-        AboutItem(
-            "Free software",
-            "GPL-3.0. No accounts, ads or tracking. Everything happens on this phone.",
-        )
+        Text(stringResource(R.string.how_it_works), style = MaterialTheme.typography.headlineSmall)
+        AboutItem(stringResource(R.string.about_copy_title), stringResource(R.string.about_copy_body))
+        AboutItem(stringResource(R.string.about_limits_title), stringResource(R.string.about_limits_body))
+        AboutItem(stringResource(R.string.about_key_title), stringResource(R.string.about_key_body))
+        AboutItem(stringResource(R.string.about_fair_title), stringResource(R.string.about_fair_body))
+        AboutItem(stringResource(R.string.about_free_title), stringResource(R.string.about_free_body))
     }
 }
 
@@ -1105,30 +1076,26 @@ private fun Settings(
             .padding(start = 24.dp, end = 24.dp, bottom = 32.dp),
         verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
-        Text("Settings", style = MaterialTheme.typography.headlineSmall)
+        Text(stringResource(R.string.settings), style = MaterialTheme.typography.headlineSmall)
         Row(
             Modifier.fillMaxWidth().toggleable(value = autoUpdate, role = Role.Switch, onValueChange = onAutoUpdate),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f)) {
-                AboutItem(
-                    "Update copies automatically",
-                    "When an app updates, CarBridge updates its car copy the next time your phone charges.",
-                )
+                AboutItem(stringResource(R.string.auto_update_title), stringResource(R.string.auto_update_body))
             }
             Spacer(Modifier.width(12.dp))
             Switch(checked = autoUpdate, onCheckedChange = null)
         }
         Column {
             AboutItem(
-                "Your CarBridge key",
-                (if (backedUp) "Backed up. " else "Not backed up yet. ") +
-                    "If CarBridge is reinstalled or its data cleared, your copies can only update again with a key " +
-                    "backup. Keep the file and its code off this phone.",
+                stringResource(R.string.key_title),
+                stringResource(if (backedUp) R.string.key_backed_up else R.string.key_not_backed_up) + " " +
+                    stringResource(R.string.key_body),
             )
             FlowRow(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilledTonalButton(onClick = onBackUp) { Text(if (backedUp) "Back up again" else "Back up key") }
-                OutlinedButton(onClick = onRestore) { Text("Restore backup") }
+                FilledTonalButton(onClick = onBackUp) { Text(stringResource(if (backedUp) R.string.back_up_again else R.string.back_up_key)) }
+                OutlinedButton(onClick = onRestore) { Text(stringResource(R.string.restore_backup)) }
             }
         }
         ShizukuSetting(shizuku, useShizuku, onUseShizuku, onAllowShizuku)
@@ -1139,8 +1106,8 @@ private fun Settings(
 private fun ShizukuSetting(state: ShizukuMode.State, on: Boolean, onSwitch: (Boolean) -> Unit, onAllow: () -> Unit) {
     val context = LocalContext.current
     val uri = LocalUriHandler.current
-    val title = "Install with Shizuku"
-    val what = "Copies install without asking, even the first time, and get the permissions the original app has."
+    val title = stringResource(R.string.shizuku_title)
+    val what = stringResource(R.string.shizuku_what)
     when (state) {
         ShizukuMode.State.Ready -> Row(
             Modifier.fillMaxWidth().toggleable(value = on, role = Role.Switch, onValueChange = onSwitch),
@@ -1154,19 +1121,19 @@ private fun ShizukuSetting(state: ShizukuMode.State, on: Boolean, onSwitch: (Boo
             AboutItem(
                 title,
                 what + " " + when (state) {
-                    ShizukuMode.State.NotInstalled -> "For advanced users: needs the Shizuku app."
+                    ShizukuMode.State.NotInstalled -> stringResource(R.string.shizuku_not_installed)
                     ShizukuMode.State.NotRunning ->
-                        "Shizuku isn't running. Start it in the Shizuku app; after a restart of your phone it must be started again." +
-                            if (on) " Until then, CarBridge asks before installing as usual." else ""
-                    else -> "Shizuku is running. Allow CarBridge to use it."
+                        stringResource(R.string.shizuku_not_running) +
+                            if (on) " " + stringResource(R.string.shizuku_until_then) else ""
+                    else -> stringResource(R.string.shizuku_needs_permission)
                 },
             )
             val (label, action) = when (state) {
-                ShizukuMode.State.NotInstalled -> "Get Shizuku" to { uri.openUri("https://shizuku.rikka.app/") }
-                ShizukuMode.State.NotRunning -> "Open Shizuku" to {
+                ShizukuMode.State.NotInstalled -> stringResource(R.string.get_shizuku) to { uri.openUri("https://shizuku.rikka.app/") }
+                ShizukuMode.State.NotRunning -> stringResource(R.string.open_shizuku) to {
                     context.packageManager.getLaunchIntentForPackage(ShizukuMode.PACKAGE)?.let(context::startActivity) ?: Unit
                 }
-                else -> "Allow CarBridge" to onAllow
+                else -> stringResource(R.string.allow_carbridge) to onAllow
             }
             OutlinedButton(onClick = action, modifier = Modifier.padding(top = 12.dp)) { Text(label) }
         }
@@ -1219,11 +1186,11 @@ private fun BackupCodeDialog(code: String, onSave: () -> Unit, onDismiss: () -> 
     var saved by rememberSaveable { mutableStateOf(false) }
     AlertDialog(
         onDismissRequest = {},
-        title = { Text("Save your recovery code") },
+        title = { Text(stringResource(R.string.code_title)) },
         text = {
             Column {
                 Text(
-                    "You need this code and the backup file to restore your key. CarBridge shows it only once.",
+                    stringResource(R.string.code_body),
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 SelectionContainer {
@@ -1235,7 +1202,7 @@ private fun BackupCodeDialog(code: String, onSave: () -> Unit, onDismiss: () -> 
                         modifier = Modifier.padding(vertical = 16.dp),
                     )
                 }
-                TextButton(onClick = { copySensitive(context, code) }) { Text("Copy code") }
+                TextButton(onClick = { copySensitive(context, code) }) { Text(stringResource(R.string.copy_code)) }
                 Row(
                     Modifier.fillMaxWidth().padding(top = 8.dp)
                         .toggleable(value = saved, role = Role.Checkbox, onValueChange = { saved = it }),
@@ -1243,18 +1210,18 @@ private fun BackupCodeDialog(code: String, onSave: () -> Unit, onDismiss: () -> 
                 ) {
                     Checkbox(checked = saved, onCheckedChange = null)
                     Spacer(Modifier.width(8.dp))
-                    Text("I've written down or saved the code", style = MaterialTheme.typography.bodyMedium)
+                    Text(stringResource(R.string.code_saved), style = MaterialTheme.typography.bodyMedium)
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onSave, enabled = saved) { Text("Save backup file") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        confirmButton = { TextButton(onClick = onSave, enabled = saved) { Text(stringResource(R.string.save_backup_file)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
     )
 }
 
 /** Marked sensitive, so Android hides the code in its clipboard preview. */
 private fun copySensitive(context: Context, text: String) {
-    val clip = ClipData.newPlainText("CarBridge recovery code", text).apply {
+    val clip = ClipData.newPlainText(context.getString(R.string.code_clip_label), text).apply {
         description.extras = PersistableBundle().apply { putBoolean(ClipDescription.EXTRA_IS_SENSITIVE, true) }
     }
     context.getSystemService(ClipboardManager::class.java).setPrimaryClip(clip)
@@ -1265,10 +1232,10 @@ private fun RestoreDialog(request: RestoreRequest, onRestore: (String) -> Unit, 
     var code by rememberSaveable { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Restore your key") },
+        title = { Text(stringResource(R.string.restore_title)) },
         text = {
             Column {
-                Text("Enter the recovery code you saved with this backup.", style = MaterialTheme.typography.bodyMedium)
+                Text(stringResource(R.string.restore_prompt), style = MaterialTheme.typography.bodyMedium)
                 TextField(
                     value = code,
                     onValueChange = { code = it },
@@ -1298,9 +1265,9 @@ private fun RestoreDialog(request: RestoreRequest, onRestore: (String) -> Unit, 
             if (request.working) {
                 CircularProgressIndicator(Modifier.size(24.dp))
             } else {
-                TextButton(onClick = { onRestore(code) }, enabled = KeyBackup.isWellFormed(code)) { Text("Restore") }
+                TextButton(onClick = { onRestore(code) }, enabled = KeyBackup.isWellFormed(code)) { Text(stringResource(R.string.restore)) }
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss, enabled = !request.working) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = onDismiss, enabled = !request.working) { Text(stringResource(R.string.cancel)) } },
     )
 }

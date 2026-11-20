@@ -115,14 +115,17 @@ class InstallStatusReceiver : BroadcastReceiver() {
                 val tap = PendingIntent.getActivity(
                     context, pkg.hashCode(), confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), PendingIntent.FLAG_IMMUTABLE,
                 )
-                AutoUpdate.notifyResult(context, label, "Android needs you to confirm its car copy update. Tap to finish.", action = tap)
+                AutoUpdate.notifyResult(context, label, context.getString(R.string.auto_confirm), action = tap)
             }
             PackageInstaller.STATUS_SUCCESS -> {
                 val version = runCatching { context.packageManager.getPackageInfo(pkg, 0).versionName }.getOrNull()
-                AutoUpdate.notifyResult(context, label, if (version != null) "Car copy updated to $version." else "Car copy updated.")
+                AutoUpdate.notifyResult(
+                    context, label,
+                    if (version != null) context.getString(R.string.auto_updated_to, version) else context.getString(R.string.auto_updated),
+                )
             }
             else -> AutoUpdate.notifyResult(
-                context, label, "Couldn't update its car copy. Open CarBridge to try again.",
+                context, label, context.getString(R.string.auto_failed),
                 Installer.describeFailure(status, intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE)),
             )
         }

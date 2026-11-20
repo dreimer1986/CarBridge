@@ -18,7 +18,7 @@ class PatchService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        val title = intent?.getStringExtra(EXTRA_TITLE) ?: "Making a car copy"
+        val title = intent?.getStringExtra(EXTRA_TITLE) ?: getString(R.string.patch_default_title)
         val text = intent?.getStringExtra(EXTRA_TEXT)
         startForeground(NOTIFICATION_ID, notification(this, title, text), ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
         // A killed process loses the patch anyway, so there's nothing to restart
@@ -54,8 +54,8 @@ class PatchService : Service() {
         private fun notification(context: Context, title: String, text: String?): Notification {
             val manager = context.getSystemService(NotificationManager::class.java)
             manager.createNotificationChannel(
-                NotificationChannel(CHANNEL, "Making car copies", NotificationManager.IMPORTANCE_LOW).apply {
-                    description = "Progress while CarBridge makes or updates a car copy"
+                NotificationChannel(CHANNEL, context.getString(R.string.channel_patching), NotificationManager.IMPORTANCE_LOW).apply {
+                    description = context.getString(R.string.channel_patching_desc)
                 },
             )
             val open = PendingIntent.getActivity(

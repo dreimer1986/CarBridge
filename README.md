@@ -211,6 +211,14 @@ Verified on 2026-11-17 on the S24 Ultra (Android 17) with a minimal test package
 signs the lineage, the backup key imports into Keystore, and the rotated update installs in place
 without a prompt.
 
+## Translations
+
+Everything the app shows is in `patcher/src/main/res/values/strings.xml`. To translate, copy it to
+`values-<language>/strings.xml` (e.g. `values-de`) and translate the text, keeping `%s`, `%d` and
+`%1$s` placeholders. A copy's name keeps the English " (Car)" suffix, since CarBridge reads it back.
+Patch logs and the technical details under **Details** stay in English, so bug reports read the
+same for everyone.
+
 ## Release signing
 
 The release key is `~/.android/carbridge-release.jks` (RSA-4096, alias `carbridge`, valid to 2056,
