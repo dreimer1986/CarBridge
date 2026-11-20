@@ -80,6 +80,18 @@ JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradle
 The release build (`:patcher:assembleRelease`) runs R8 and is about 5 MB. apksig's ASN.1 models
 need the keep rules in `patcher/proguard-rules.pro`, or v1 signing fails.
 
+Gradle checks every dependency against the SHA-256 sums in `gradle/verification-metadata.xml`
+and stops on a mismatch. After changing a dependency (including a Dependabot PR, which fails CI
+until this is done), regenerate the sums and review the diff before committing:
+
+```bash
+./gradlew --write-verification-metadata sha256 :core:test :patcher:testDebugUnitTest :patcher:testDevUnitTest \
+  :patcher:assembleDebug :patcher:assembleDev :patcher:assembleRelease :patcher:lintDebug
+```
+
+`aapt2` ships one jar per OS and Gradle only records the one for the machine it runs on; add the
+`-linux` (CI) and `-windows` jars' sums by hand from Google Maven when AGP changes.
+
 ## Use
 
 Open CarBridge, tap **Add** next to an app, and confirm Android's install prompt. The copy installs
