@@ -18,6 +18,9 @@ What changed in each CarBridge release. Dev pre-releases show the Unreleased sec
 - Settings → Check a backup: test a key backup and its code without restoring it
 - Moving to a new phone: key backups now list your copies, and restoring one offers to put them all back on your car with the same choices
 - After installing, CarBridge checks that Android Auto can list the copy, and a copy that can't says why
+- The app list loads much faster after the first time
+- Background update notices for different apps no longer replace each other
+- A notice says when a background update took too long, so you can update that copy yourself
 
 ## [0.6.0] - 2026-11-17
 
