@@ -4,7 +4,8 @@ name: CI
 
 on:
   push:
-    branches: [master]
+    # dev too: Dev builds only run unit tests, not the real-APK and SDK tool checks
+    branches: [master, dev]
   pull_request:
 
 jobs:
