@@ -1,0 +1,9 @@
+- Back up your signing key; restore it after reinstalling or on a new phone
+- Copies update automatically while your phone charges
+- Make copies from APK files and .apks/.xapk bundles
+- Optional Shizuku support: installs without prompts
+- Hide a copy from the phone's app list
+- Settings for how new copies are made
+- Add several apps at once
+- A little car shows how far along a copy is
+- Asks you to reconnect only when Android Auto needs it

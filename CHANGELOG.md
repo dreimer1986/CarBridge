@@ -4,6 +4,8 @@ What changed in each CarBridge release. Dev pre-releases show the Unreleased sec
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-20
+
 - Back up your signing key with a recovery code, and restore it after reinstalling CarBridge so your copies can update again
 - Car copies update automatically while your phone charges, with a per-copy opt-out
 - New Settings screen (gear icon) for key backup and automatic updates
