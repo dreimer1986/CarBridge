@@ -4,6 +4,8 @@ What changed in each CarBridge release. Dev pre-releases show the Unreleased sec
 
 ## [Unreleased]
 
+- Landscape: the app list stays clear of the navigation bar and camera, and the A–Z strip fits
+
 ## [0.7.0] - 2026-11-20
 
 - Back up your signing key with a recovery code, and restore it after reinstalling CarBridge so your copies can update again

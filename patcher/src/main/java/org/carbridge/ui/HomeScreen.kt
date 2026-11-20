@@ -17,6 +17,9 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -201,7 +204,8 @@ fun HomeScreen(model: HomeModel, actions: HomeActions) {
         },
         contentWindowInsets = WindowInsets(0),
     ) { inner ->
-        Box(Modifier.fillMaxSize()) {
+        // In landscape the navigation bar and camera cutout sit at the sides, so keep rows clear of them
+        Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))) {
             LazyColumn(
                 Modifier.fillMaxSize(),
                 state = listState,

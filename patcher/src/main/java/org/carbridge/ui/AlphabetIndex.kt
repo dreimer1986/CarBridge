@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -93,22 +94,26 @@ fun AlphabetIndex(present: Set<Char>, current: Char?, onLetter: (Char) -> Unit, 
                         onDragCancel = { dragging = null },
                     ) { change, _ -> pick(change.position.y) }
                 },
-            verticalArrangement = Arrangement.SpaceEvenly,
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            // Landscape leaves too little height for every letter at full size, so shrink them to fit
+            val density = LocalDensity.current
+            val slot = with(density) { (height / Letters.ALL.size).toSp() }
+            val size = minOf(11f, slot.value * 0.8f).sp
             for (letter in Letters.ALL) {
                 val active = letter == (dragging ?: current)
-                Text(
+                // Equal slots, so the letters line up with the drag positions that pick them
+                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { Text(
                     letter.toString(),
-                    fontSize = 11.sp,
-                    lineHeight = 12.sp,
+                    fontSize = size,
+                    lineHeight = size * 1.1f,
                     fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
                     color = when {
                         active -> MaterialTheme.colorScheme.primary
                         letter in present -> MaterialTheme.colorScheme.onSurfaceVariant
                         else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)
                     },
-                )
+                ) }
             }
         }
         // The finger covers the strip, so show the letter beside it
