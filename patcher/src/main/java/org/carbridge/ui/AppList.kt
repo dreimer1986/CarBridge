@@ -1,12 +1,12 @@
 package org.carbridge.ui
 
 import android.text.format.Formatter
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -14,8 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -29,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -79,14 +79,17 @@ internal fun AutoAppsToggle(count: Int, showing: Boolean, onToggle: () -> Unit) 
 @Composable
 internal fun SourceRow(app: SourceApp, enabled: Boolean, endPadding: Dp, onAdd: () -> Unit) {
     val context = LocalContext.current
+    // The whole row adds the app; the trailing button only marks it, so TalkBack hears one action
     Row(
-        Modifier.fillMaxWidth().padding(start = Gutter, end = endPadding, top = 8.dp, bottom = 8.dp),
+        Modifier.fillMaxWidth()
+            .clickable(enabled = enabled, onClickLabel = stringResource(R.string.add_title, app.label), onClick = onAdd)
+            .padding(start = Gutter, end = endPadding, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         AppIcon(app.icon, 44)
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
-            Text(app.label, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(app.label, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Text(
                 listOfNotNull(
                     when (app.caution) {
@@ -102,10 +105,8 @@ internal fun SourceRow(app: SourceApp, enabled: Boolean, endPadding: Dp, onAdd: 
             )
         }
         Spacer(Modifier.width(8.dp))
-        FilledTonalButton(onClick = onAdd, enabled = enabled, contentPadding = ButtonDefaults.ButtonWithIconContentPadding) {
-            Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(6.dp))
-            Text(stringResource(R.string.add))
+        FilledTonalIconButton(onClick = onAdd, enabled = enabled, modifier = Modifier.clearAndSetSemantics {}) {
+            Icon(Icons.Rounded.Add, contentDescription = null)
         }
     }
 }

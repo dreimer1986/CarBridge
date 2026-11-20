@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Phone
@@ -21,6 +22,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -33,8 +35,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.carbridge.CarCopy
@@ -79,13 +87,22 @@ internal fun CarSign(
                                 copy.carProblem != null -> stringResource(R.string.car_problem_subtitle, stringResource(copy.carProblem.text))
                                 copy.outdated -> "${versionText(copy.version!!, copy.originalVersion!!)} → " +
                                     versionText(copy.originalVersion, copy.version)
-                                else -> copy.version?.name ?: stringResource(R.string.copy_in_android_auto)
+                                else -> copy.version?.name?.let(::shortVersion) ?: stringResource(R.string.copy_in_android_auto)
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = signs.onGuideMuted,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
+                        val tags = choiceTags(copy, autoUpdates = onAutoUpdate != null)
+                        if (tags.isNotEmpty()) {
+                            Text(
+                                tags.joinToString(" · "),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = signs.onGuide,
+                                modifier = Modifier.padding(top = 2.dp),
+                            )
+                        }
                     }
                 }
                 if (copy.outdated && copy.updatable) {
@@ -106,13 +123,6 @@ internal fun CarSign(
                             leadingIcon = { Icon(Icons.Rounded.Phone, contentDescription = null) },
                             onClick = { menu = false; onOpen() },
                         )
-                        if (copy.fromFile && !copy.signedElsewhere) {
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.menu_update_from_file)) },
-                                leadingIcon = { Icon(Icons.Rounded.Refresh, contentDescription = null) },
-                                onClick = { menu = false; onUpdateFromFile() },
-                            )
-                        }
                         if (copy.updatable) {
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.menu_update_copy)) },
@@ -120,38 +130,36 @@ internal fun CarSign(
                                 onClick = { menu = false; onUpdate() },
                             )
                         }
-                        if (copy.updatable && copy.portraitLocked) {
+                        if (copy.fromFile && !copy.signedElsewhere) {
                             DropdownMenuItem(
-                                text = { Text(stringResource(if (copy.options.fillScreen) R.string.menu_keep_portrait else R.string.menu_fill_screen)) },
-                                leadingIcon = { Icon(LandscapeGlyph, contentDescription = null) },
-                                onClick = { menu = false; onFillScreen(!copy.options.fillScreen) },
-                            )
-                        }
-                        if (copy.updatable && copy.hasMediaService) {
-                            val keep = copy.options.keepMediaServices
-                            DropdownMenuItem(
-                                // Kept media services let Android Auto show its audio player for the copy
-                                text = { Text(stringResource(if (keep) R.string.menu_full_app else R.string.menu_audio_player)) },
-                                leadingIcon = { Icon(Icons.Rounded.PlayArrow, contentDescription = null) },
-                                onClick = { menu = false; onKeepMedia(!keep) },
+                                text = { Text(stringResource(R.string.menu_update_from_file)) },
+                                leadingIcon = { Icon(FileGlyph, contentDescription = null) },
+                                onClick = { menu = false; onUpdateFromFile() },
                             )
                         }
                         if (copy.updatable) {
-                            val hidden = copy.options.hideOnPhone
-                            DropdownMenuItem(
-                                text = { Text(stringResource(if (hidden) R.string.menu_show_on_phone else R.string.menu_hide_on_phone)) },
-                                leadingIcon = { Icon(Icons.Rounded.Phone, contentDescription = null) },
-                                onClick = { menu = false; onHideOnPhone(!hidden) },
-                            )
+                            HorizontalDivider()
+                            if (copy.portraitLocked) {
+                                ChoiceItem(R.string.menu_fill_screen, LandscapeGlyph, copy.options.fillScreen) {
+                                    menu = false; onFillScreen(it)
+                                }
+                            }
+                            if (copy.hasMediaService) {
+                                // Kept media services let Android Auto show its audio player for the copy
+                                ChoiceItem(R.string.menu_audio_player, Icons.Rounded.PlayArrow, copy.options.keepMediaServices) {
+                                    menu = false; onKeepMedia(it)
+                                }
+                            }
+                            ChoiceItem(R.string.menu_show_on_phone, AppGridGlyph, !copy.options.hideOnPhone) {
+                                menu = false; onHideOnPhone(!it)
+                            }
+                            if (onAutoUpdate != null) {
+                                ChoiceItem(R.string.menu_auto_update, ChargingGlyph, copy.autoUpdateAllowed) {
+                                    menu = false; onAutoUpdate(it)
+                                }
+                            }
                         }
-                        if (copy.updatable && onAutoUpdate != null) {
-                            val allowed = copy.autoUpdateAllowed
-                            DropdownMenuItem(
-                                text = { Text(stringResource(if (allowed) R.string.menu_no_auto_update else R.string.menu_auto_update)) },
-                                leadingIcon = { Icon(Icons.Rounded.Refresh, contentDescription = null) },
-                                onClick = { menu = false; onAutoUpdate(!allowed) },
-                            )
-                        }
+                        HorizontalDivider()
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.menu_remove)) },
                             leadingIcon = { Icon(Icons.Rounded.Delete, contentDescription = null) },
@@ -163,6 +171,34 @@ internal fun CarSign(
         }
     }
 }
+
+/** A menu choice that shows its current state with a check, and flips it when tapped. */
+@Composable
+private fun ChoiceItem(label: Int, icon: ImageVector, on: Boolean, onChange: (Boolean) -> Unit) {
+    DropdownMenuItem(
+        text = { Text(stringResource(label)) },
+        leadingIcon = { Icon(icon, contentDescription = null) },
+        trailingIcon = if (on) ({ Icon(Icons.Rounded.Check, contentDescription = null) }) else null,
+        onClick = { onChange(!on) },
+        modifier = Modifier.semantics {
+            role = Role.Checkbox
+            toggleableState = ToggleableState(on)
+        },
+    )
+}
+
+/** Choices that differ from a plain copy, so the card says how this copy behaves. */
+@Composable
+private fun choiceTags(copy: CarCopy, autoUpdates: Boolean): List<String> = listOfNotNull(
+    stringResource(R.string.tag_portrait).takeIf { copy.portraitLocked && !copy.options.fillScreen },
+    stringResource(R.string.tag_audio_player).takeIf { copy.hasMediaService && copy.options.keepMediaServices },
+    stringResource(R.string.tag_hidden).takeIf { copy.options.hideOnPhone },
+    stringResource(R.string.tag_manual_updates).takeIf { autoUpdates && copy.updatable && !copy.autoUpdateAllowed },
+)
+
+/** Drops build metadata, e.g. "6.34.0+18552420-google" becomes "6.34.0". */
+internal fun shortVersion(name: String): String =
+    name.substringBefore('+').substringBefore(' ').ifEmpty { name }
 
 /** A sign-yellow tab on top of the panel, like the exit tab on a guide sign. */
 @Composable
@@ -185,7 +221,8 @@ private fun UpdateTab() {
 /** Version name, or the build number when both sides share a name (e.g. a same-name rebuild). */
 @Composable
 private fun versionText(version: Version, other: Version): String =
-    version.name?.takeIf { it != other.name } ?: stringResource(R.string.version_build, version.code)
+    version.name?.let(::shortVersion)?.takeIf { it != other.name?.let(::shortVersion) }
+        ?: stringResource(R.string.version_build, version.code)
 
 @Composable
 internal fun UpdateAllRow(count: Int, enabled: Boolean, onClick: () -> Unit) {

@@ -1,7 +1,5 @@
 package org.carbridge.ui
 
-import org.carbridge.ShizukuMode
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
@@ -13,22 +11,30 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material3.Button
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import org.carbridge.R
+import org.carbridge.ShizukuMode
 import org.carbridge.core.CarOptions
 
 @Composable
@@ -73,7 +79,7 @@ internal fun Settings(
         Text(stringResource(R.string.settings), style = MaterialTheme.typography.headlineSmall)
         SettingSwitch(stringResource(R.string.auto_update_title), stringResource(R.string.auto_update_body), autoUpdate, onAutoUpdate)
         Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            AboutItem(stringResource(R.string.defaults_title), stringResource(R.string.defaults_body))
+            SettingsHeading(stringResource(R.string.defaults_title), stringResource(R.string.defaults_body))
             SettingSwitch(stringResource(R.string.choice_fill_title), stringResource(R.string.defaults_fill_body), defaults.fillScreen) {
                 onDefaults(defaults.copy(fillScreen = it))
             }
@@ -84,19 +90,21 @@ internal fun Settings(
                 onDefaults(defaults.copy(hideOnPhone = it))
             }
         }
-        Column {
-            AboutItem(
-                stringResource(R.string.key_title),
-                listOfNotNull(
-                    stringResource(if (backedUp) R.string.key_backed_up else R.string.key_not_backed_up),
-                    if (backedUp && notInBackup > 0) pluralStringResource(R.plurals.key_copies_missing, notInBackup, notInBackup) else null,
-                    stringResource(R.string.key_body),
-                ).joinToString(" "),
-            )
-            FlowRow(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilledTonalButton(onClick = onBackUp) { Text(stringResource(if (backedUp) R.string.back_up_again else R.string.back_up_key)) }
-                OutlinedButton(onClick = onRestore) { Text(stringResource(R.string.restore_backup)) }
-                OutlinedButton(onClick = onCheck) { Text(stringResource(R.string.check_backup)) }
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            SettingsHeading(stringResource(R.string.key_title), stringResource(R.string.key_body))
+            val missing = if (backedUp && notInBackup > 0) pluralStringResource(R.plurals.key_copies_missing, notInBackup, notInBackup) else null
+            if (!backedUp || missing != null) {
+                // The one warning here that can cost copies, so it gets the caution sign, not body text
+                BackupCallout(missing ?: stringResource(R.string.key_not_backed_up), stringResource(if (backedUp) R.string.back_up_again else R.string.back_up_key), onBackUp)
+            } else {
+                Text(stringResource(R.string.key_backed_up), style = MaterialTheme.typography.titleMedium)
+            }
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (backedUp && missing == null) {
+                    FilledTonalButton(onClick = onBackUp) { Text(stringResource(R.string.back_up_again)) }
+                }
+                TextButton(onClick = onRestore) { Text(stringResource(R.string.restore_backup)) }
+                TextButton(onClick = onCheck) { Text(stringResource(R.string.check_backup)) }
             }
         }
         ShizukuSetting(shizuku, useShizuku, onUseShizuku, onAllowShizuku)
@@ -142,6 +150,36 @@ private fun ShizukuSetting(state: ShizukuMode.State, on: Boolean, onSwitch: (Boo
                 else -> stringResource(R.string.allow_carbridge) to onAllow
             }
             OutlinedButton(onClick = action, modifier = Modifier.padding(top = 12.dp)) { Text(label) }
+        }
+    }
+}
+
+/** Names a group of settings; set apart from the settings' own titles by color and spacing. */
+@Composable
+private fun SettingsHeading(title: String, body: String) {
+    Column(Modifier.padding(top = 8.dp)) {
+        Text(
+            title,
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.semantics { heading() },
+        )
+        Text(
+            body,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+    }
+}
+
+@Composable
+private fun BackupCallout(text: String, action: String, onAction: () -> Unit) {
+    val signs = LocalSigns.current
+    Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), color = signs.caution, contentColor = signs.onCaution) {
+        Column(Modifier.padding(16.dp)) {
+            Text(text, style = MaterialTheme.typography.titleMedium)
+            Button(onClick = onAction, colors = cautionButton(), modifier = Modifier.padding(top = 12.dp)) { Text(action) }
         }
     }
 }

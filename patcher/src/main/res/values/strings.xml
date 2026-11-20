@@ -78,15 +78,16 @@
     <string name="menu_open_on_phone">Open on phone</string>
     <string name="menu_update_from_file">Update from a file</string>
     <string name="menu_update_copy">Update copy</string>
-    <string name="menu_keep_portrait">Keep portrait layout</string>
     <string name="menu_fill_screen">Fill the car screen</string>
-    <string name="menu_full_app">Always show the full app</string>
     <string name="menu_audio_player">Use Android Auto\'s audio player</string>
     <string name="menu_show_on_phone">Show in phone\'s app list</string>
     <string name="menu_hide_on_phone">Hide from phone\'s app list</string>
-    <string name="menu_no_auto_update">Don\'t update automatically</string>
     <string name="menu_auto_update">Update automatically</string>
     <string name="menu_remove">Remove from car</string>
+    <string name="tag_portrait">Portrait layout</string>
+    <string name="tag_audio_player">Audio player</string>
+    <string name="tag_hidden">Hidden on phone</string>
+    <string name="tag_manual_updates">Updates by hand</string>
     <plurals name="copies_outdated">
         <item quantity="one">%d copy is out of date</item>
         <item quantity="other">%d copies are out of date</item>
@@ -109,7 +110,6 @@
     <string name="copy_protected">Copy protected</string>
     <string name="patched_with_morphe">Patched with Morphe</string>
     <string name="has_android_auto">Has Android Auto</string>
-    <string name="add">Add</string>
 
     <!-- Add dialogs -->
     <string name="add_title">Add %s</string>

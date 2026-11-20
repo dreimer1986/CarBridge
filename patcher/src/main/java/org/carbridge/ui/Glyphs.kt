@@ -42,3 +42,41 @@ val LandscapeGlyph: ImageVector by lazy {
         }
     }.build()
 }
+
+/** Four app tiles, for the phone's app list. */
+val AppGridGlyph: ImageVector by lazy {
+    ImageVector.Builder("AppGrid", 24.dp, 24.dp, 24f, 24f).apply {
+        path(stroke = SolidColor(Color.Black), strokeLineWidth = 2f, strokeLineJoin = StrokeJoin.Round) {
+            for ((x, y) in listOf(4f to 4f, 14f to 4f, 4f to 14f, 14f to 14f)) {
+                moveTo(x + 1.5f, y); lineTo(x + 4.5f, y)
+                quadTo(x + 6f, y, x + 6f, y + 1.5f); lineTo(x + 6f, y + 4.5f)
+                quadTo(x + 6f, y + 6f, x + 4.5f, y + 6f); lineTo(x + 1.5f, y + 6f)
+                quadTo(x, y + 6f, x, y + 4.5f); lineTo(x, y + 1.5f)
+                quadTo(x, y, x + 1.5f, y); close()
+            }
+        }
+    }.build()
+}
+
+/** A charging bolt: automatic updates run while the phone charges. */
+val ChargingGlyph: ImageVector by lazy {
+    ImageVector.Builder("Charging", 24.dp, 24.dp, 24f, 24f).apply {
+        path(stroke = SolidColor(Color.Black), strokeLineWidth = 2f, strokeLineJoin = StrokeJoin.Round) {
+            moveTo(13f, 3f); lineTo(5f, 13.5f); lineTo(11.5f, 13.5f)
+            lineTo(10.5f, 21f); lineTo(19f, 10.5f); lineTo(12.5f, 10.5f); close()
+        }
+    }.build()
+}
+
+/** A document with a folded corner, for updating a copy from APK files. */
+val FileGlyph: ImageVector by lazy {
+    ImageVector.Builder("File", 24.dp, 24.dp, 24f, 24f).apply {
+        path(stroke = SolidColor(Color.Black), strokeLineWidth = 2f, strokeLineJoin = StrokeJoin.Round) {
+            moveTo(14f, 3f); lineTo(7f, 3f)
+            quadTo(5f, 3f, 5f, 5f); lineTo(5f, 19f)
+            quadTo(5f, 21f, 7f, 21f); lineTo(17f, 21f)
+            quadTo(19f, 21f, 19f, 19f); lineTo(19f, 8f); close()
+            moveTo(14f, 3f); lineTo(14f, 8f); lineTo(19f, 8f)
+        }
+    }.build()
+}

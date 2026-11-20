@@ -21,6 +21,10 @@ What changed in each CarBridge release. Dev pre-releases show the Unreleased sec
 - The app list loads much faster after the first time
 - Background update notices for different apps no longer replace each other
 - A notice says when a background update took too long, so you can update that copy yourself
+- Copy cards list a copy's own choices, e.g. "Hidden on phone", and show short version numbers
+- The ⋮ menu marks each copy's choices with a checkmark and has its own icon for each
+- Tap anywhere on an app in the list to add it; long names wrap instead of being cut off
+- Settings has clearer sections, and a yellow notice when your key backup is missing copies
 
 ## [0.6.0] - 2026-11-17
 
