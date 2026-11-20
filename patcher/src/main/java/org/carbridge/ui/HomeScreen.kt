@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.foundation.lazy.LazyColumn
@@ -36,6 +37,7 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
@@ -250,11 +252,16 @@ fun HomeScreen(model: HomeModel, actions: HomeActions) {
 
                 item("add-title") { SectionTitle(stringResource(R.string.add_an_app)) }
                 item("add-file") {
-                    OutlinedButton(
+                    // Secondary to the list below: most people add apps that are already installed
+                    TextButton(
                         onClick = { actions.pickApks(null) },
                         enabled = !busy,
-                        modifier = Modifier.padding(start = Gutter, end = Gutter, bottom = 12.dp),
-                    ) { Text(stringResource(R.string.add_from_file)) }
+                        modifier = Modifier.padding(start = Gutter - 12.dp, end = Gutter, bottom = 4.dp),
+                    ) {
+                        Icon(FileGlyph, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.add_from_file))
+                    }
                 }
                 if (catalog != null) {
                     if (catalog.available.size > 6) {

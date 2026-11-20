@@ -27,6 +27,8 @@ What changed in each CarBridge release. Dev pre-releases show the Unreleased sec
 - Settings has clearer sections, and a yellow notice when your key backup is missing copies
 - The app name fits on one line, and no green strip stays at the top once you scroll past it
 - Text is easier to read, with tighter letter spacing
+- Car copies show their app's own icon in CarBridge, without the badge covering it
+- Settings puts Shizuku under Advanced
 
 ## [0.6.0] - 2026-11-17
 

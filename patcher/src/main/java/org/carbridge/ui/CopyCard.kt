@@ -74,7 +74,8 @@ internal fun CarSign(
                     Modifier.weight(1f).clickable(enabled = !busy, onClickLabel = stringResource(R.string.open_copy, copy.label), onClick = onOpen),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    AppIcon(copy.icon, 40)
+                    // The copy's own icon carries a launcher badge that covers art; the sign already says "copy"
+                    AppIcon(copy.original?.icon ?: copy.icon, 40)
                     Spacer(Modifier.width(12.dp))
                     Column {
                         Text(copy.label, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)

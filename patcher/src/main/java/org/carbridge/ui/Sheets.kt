@@ -107,7 +107,10 @@ internal fun Settings(
                 TextButton(onClick = onCheck) { Text(stringResource(R.string.check_backup)) }
             }
         }
-        ShizukuSetting(shizuku, useShizuku, onUseShizuku, onAllowShizuku)
+        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            SettingsHeading(stringResource(R.string.settings_advanced))
+            ShizukuSetting(shizuku, useShizuku, onUseShizuku, onAllowShizuku)
+        }
     }
 }
 
@@ -156,7 +159,7 @@ private fun ShizukuSetting(state: ShizukuMode.State, on: Boolean, onSwitch: (Boo
 
 /** Names a group of settings; set apart from the settings' own titles by color and spacing. */
 @Composable
-private fun SettingsHeading(title: String, body: String) {
+private fun SettingsHeading(title: String, body: String? = null) {
     Column(Modifier.padding(top = 8.dp)) {
         Text(
             title,
@@ -164,12 +167,14 @@ private fun SettingsHeading(title: String, body: String) {
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.semantics { heading() },
         )
-        Text(
-            body,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 4.dp),
-        )
+        if (body != null) {
+            Text(
+                body,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
     }
 }
 
