@@ -17,3 +17,6 @@ updates:
     ignore:
       - dependency-name: "com.android.application"
         update-types: ["version-update:semver-major"]
+      # Gradle 9.6+ drops an internal API that AGP 8.x needs; lift with the AGP 9 upgrade
+      - dependency-name: "gradle-wrapper"
+        versions: [">= 9.6"]
