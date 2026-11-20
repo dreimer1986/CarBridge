@@ -69,9 +69,9 @@ class KeystoreSigner(context: Context) {
 
     /**
      * A new backup of the key new copies are signed with: a software key that key vouches for,
-     * sealed with a fresh recovery code. Neither is kept on the phone.
+     * plus [copies], sealed with a fresh recovery code. Neither key nor code is kept on the phone.
      */
-    fun createBackup(): Pair<ByteArray, String> {
+    fun createBackup(copies: List<BackedUpCopy>): Pair<ByteArray, String> {
         val parent = active(create = true)!!
         val pair = KeyPairGenerator.getInstance("RSA").apply { initialize(KEY_BITS) }.generateKeyPair()
         val cert = SelfSignedCertificate.create(pair, "CarBridge backup signer", YEARS)
@@ -80,7 +80,7 @@ class KeystoreSigner(context: Context) {
         val lineage = parent.lineage?.spawnDescendant(parentConfig, childConfig)
             ?: SigningCertificateLineage.Builder(parentConfig, childConfig).setMinSdkVersion(28).build()
         val code = KeyBackup.newRecoveryCode()
-        return KeyBackup(pair.private, cert, lineage).seal(code) to code
+        return KeyBackup(pair.private, cert, lineage, copies).seal(code) to code
     }
 
     /** Call once the user has saved the file from [createBackup]. */
@@ -106,15 +106,15 @@ class KeystoreSigner(context: Context) {
     }
 
     /**
-     * Opens [file] without importing it. True when it can restore the key new copies are signed
-     * with; then that key counts as backed up, since the user has just shown the file works.
+     * Opens [file] without importing it. Returns the backup when it can restore the key new copies
+     * are signed with, which then counts as backed up, since the user has just shown the file works.
      */
-    fun check(file: ByteArray, code: String): Boolean {
+    fun check(file: ByteArray, code: String): KeyBackup? {
         val backup = KeyBackup.open(file, code)
-        val active = active(create = false) ?: return false
-        if (!backup.covers(active.cert)) return false
+        val active = active(create = false) ?: return null
+        if (!backup.covers(active.cert)) return null
         backedUp.writeText(active.fingerprint)
-        return true
+        return backup
     }
 
     /** The current signer of installed [pkg]; null when it isn't installed or can't be read. */

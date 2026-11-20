@@ -18,6 +18,14 @@
     <string name="restore_card_body">CarBridge was reinstalled or its data cleared, so it can\'t update copies made before. If you saved a key backup, restore it.</string>
     <string name="restore_backup">Restore backup</string>
     <string name="restore_none">I don\'t have one</string>
+    <plurals name="readd_title">
+        <item quantity="one">Put %d app back on your car</item>
+        <item quantity="other">Put %d apps back on your car</item>
+    </plurals>
+    <string name="readd_body">Your key backup lists these, and they\'re installed here: %s. CarBridge makes their copies again with the choices you saved. Copies start without data, so sign in again.</string>
+    <string name="readd_action">Add them back</string>
+    <string name="not_now">Not now</string>
+    <string name="restore_from_other_phone">Moving from another phone? Restore your key backup</string>
     <string name="backup_card_title">Back up your CarBridge key</string>
     <string name="backup_card_body">If CarBridge is reinstalled or its data cleared, your copies can only update again with this backup.</string>
     <string name="back_up">Back up</string>
@@ -155,6 +163,10 @@
     <string name="key_title">Your CarBridge key</string>
     <string name="key_backed_up">Backed up.</string>
     <string name="key_not_backed_up">Not backed up yet.</string>
+    <plurals name="key_copies_missing">
+        <item quantity="one">%d copy isn\'t in your backup yet; back up again so a new phone can add it back.</item>
+        <item quantity="other">%d copies aren\'t in your backup yet; back up again so a new phone can add them back.</item>
+    </plurals>
     <string name="key_body">If CarBridge is reinstalled or its data cleared, your copies can only update again with a key backup. Keep the file and its code off this phone.</string>
     <string name="back_up_again">Back up again</string>
     <string name="back_up_key">Back up key</string>
@@ -202,6 +214,7 @@
         <item quantity="one">Key restored. %d copy can update again.</item>
         <item quantity="other">Key restored. %d copies can update again.</item>
     </plurals>
+    <string name="msg_restored_readd">Key restored. Put your apps back on your car from the card at the top.</string>
     <string name="msg_restored_covers">Key restored. It signs your copies\' updates from now on.</string>
     <string name="msg_restored_new">Key restored. It doesn\'t match any copy on this phone, but it will sign new ones.</string>
     <string name="msg_busy_file">CarBridge is making another copy. Open the file again when it\'s done.</string>

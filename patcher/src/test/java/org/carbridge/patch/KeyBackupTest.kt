@@ -7,6 +7,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
+import org.carbridge.core.CarOptions
 import org.junit.Test
 
 class KeyBackupTest {
@@ -29,6 +30,33 @@ class KeyBackupTest {
         assertArrayEquals(backup.key.encoded, opened.key.encoded)
         assertEquals(backup.cert, opened.cert)
         assertEquals(backup.lineage.certificatesInLineage, opened.lineage.certificatesInLineage)
+    }
+
+    @Test
+    fun keepsTheCopyList() {
+        val copies = listOf(
+            BackedUpCopy("org.videolan.vlc", CarOptions(keepMediaServices = true, fillScreen = false), autoUpdate = true),
+            BackedUpCopy("org.mozilla.firefox", CarOptions(hideOnPhone = true), autoUpdate = false),
+        )
+        val code = KeyBackup.newRecoveryCode()
+        val withCopies = KeyBackup(backup.key, backup.cert, backup.lineage, copies)
+        assertEquals(copies, KeyBackup.open(withCopies.seal(code), code).copies)
+    }
+
+    @Test
+    fun opensVersionOneFiles() {
+        val code = KeyBackup.newRecoveryCode()
+        val withCopies = KeyBackup(backup.key, backup.cert, backup.lineage, listOf(BackedUpCopy("a.b", CarOptions(), true)))
+        val opened = KeyBackup.open(withCopies.seal(code, version = 1), code)
+        assertEquals(backup.cert, opened.cert)
+        assertTrue(opened.copies.isEmpty())
+    }
+
+    @Test
+    fun refusesNewerFiles() {
+        val code = KeyBackup.newRecoveryCode()
+        val failure = assertThrows(BackupFailure::class.java) { KeyBackup.open(backup.seal(code, version = 3), code) }
+        assertEquals(BackupFailure.Reason.Newer, failure.reason)
     }
 
     @Test

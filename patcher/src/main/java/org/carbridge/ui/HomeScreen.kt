@@ -258,6 +258,18 @@ fun HomeScreen(model: HomeModel, actions: HomeActions) {
                             onOther = model::declineRestore,
                         )
                     }
+                } else if (model.restorable.isNotEmpty()) {
+                    item("re-add") {
+                        val apps = model.restorable
+                        KeyCard(
+                            title = pluralStringResource(R.plurals.readd_title, apps.size, apps.size),
+                            body = stringResource(R.string.readd_body, apps.joinToString { it.label }),
+                            action = stringResource(R.string.readd_action),
+                            onAction = model::addRestorable,
+                            other = stringResource(R.string.not_now),
+                            onOther = model::dismissRestorable,
+                        )
+                    }
                 } else if (catalog != null && catalog.copies.any { !it.signedElsewhere } && !model.backedUp && !backupLater) {
                     item("backup") {
                         KeyCard(
@@ -275,7 +287,13 @@ fun HomeScreen(model: HomeModel, actions: HomeActions) {
                 when {
                     catalog == null -> item("loading") { Loading() }
                     catalog.copies.isEmpty() -> item("car-empty") {
-                        Hint(stringResource(R.string.car_empty))
+                        Column {
+                            Hint(stringResource(R.string.car_empty))
+                            // A new phone starts here; its old copies come back through the key backup
+                            TextButton(onClick = actions.pickBackup, modifier = Modifier.padding(start = 4.dp)) {
+                                Text(stringResource(R.string.restore_from_other_phone))
+                            }
+                        }
                     }
                     else -> {
                         val outdated = catalog.copies.filter { it.outdated && it.updatable }
@@ -422,6 +440,7 @@ fun HomeScreen(model: HomeModel, actions: HomeActions) {
                 defaults = model.defaults,
                 onDefaults = model::changeDefaults,
                 backedUp = model.backedUp,
+                notInBackup = model.notInBackup,
                 onBackUp = { showSettings = false; model.startBackup() },
                 onRestore = { showSettings = false; actions.pickBackup() },
                 onCheck = { showSettings = false; actions.checkBackup() },
@@ -1070,6 +1089,7 @@ private fun Settings(
     defaults: CarOptions,
     onDefaults: (CarOptions) -> Unit,
     backedUp: Boolean,
+    notInBackup: Int,
     onBackUp: () -> Unit,
     onRestore: () -> Unit,
     onCheck: () -> Unit,
@@ -1101,8 +1121,11 @@ private fun Settings(
         Column {
             AboutItem(
                 stringResource(R.string.key_title),
-                stringResource(if (backedUp) R.string.key_backed_up else R.string.key_not_backed_up) + " " +
+                listOfNotNull(
+                    stringResource(if (backedUp) R.string.key_backed_up else R.string.key_not_backed_up),
+                    if (backedUp && notInBackup > 0) pluralStringResource(R.plurals.key_copies_missing, notInBackup, notInBackup) else null,
                     stringResource(R.string.key_body),
+                ).joinToString(" "),
             )
             FlowRow(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilledTonalButton(onClick = onBackUp) { Text(stringResource(if (backedUp) R.string.back_up_again else R.string.back_up_key)) }

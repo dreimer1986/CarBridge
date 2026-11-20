@@ -23,6 +23,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.carbridge.core.CarOptions
 import org.carbridge.patch.ApkImport
+import org.carbridge.patch.BackedUpCopy
 import rikka.shizuku.Shizuku
 import org.carbridge.patch.BackupFailure
 import org.carbridge.patch.ImportFailure
@@ -31,6 +32,12 @@ import org.carbridge.patch.KeystoreSigner
 import org.carbridge.patch.PatchPipeline
 
 private const val TAG = "CarBridge"
+
+// Original packages a restored backup listed, until their copies are made or the offer dismissed
+private const val RESTORE_PENDING = "restore_pending"
+
+// Original packages the latest saved or checked backup lists
+private const val BACKUP_COPIES = "backup_copies"
 
 /** A car copy being made; [step] indexes [JobStep]. */
 data class Job(
@@ -77,7 +84,7 @@ data class AddChoice(val app: SourceApp, val portraitLocked: Boolean, val hasMed
 data class UserMessage(val text: String, val details: String? = null)
 
 /** A key backup made but not yet saved; [code] is shown once and never stored. */
-class NewBackup(val file: ByteArray, val code: String)
+class NewBackup(val file: ByteArray, val code: String, val copies: List<BackedUpCopy>)
 
 /** A backup file the user picked, waiting for its recovery code; [checkOnly] tests it without restoring. */
 class RestoreRequest(val file: ByteArray, val checkOnly: Boolean = false, val error: String? = null, val working: Boolean = false)
@@ -121,9 +128,10 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
     private val _messages = Channel<UserMessage>(Channel.BUFFERED)
     val messages = _messages.receiveAsFlow()
     private val log = mutableListOf<String>()
-    private val updateQueue = ArrayDeque<SourceApp>()
+    /** Apps waiting in an Update all or Add them back run, and whether each is an update. */
+    private val updateQueue = ArrayDeque<Pair<SourceApp, Boolean>>()
 
-    /** Copies still waiting in an Update all run, including the one being built. */
+    /** Copies still waiting in a run, including the one being built. */
     var queued by mutableStateOf(0)
         private set
 
@@ -180,8 +188,25 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
     fun updateAll(copies: List<CarCopy>) {
         if (job != null) return
         updateQueue.clear()
-        updateQueue.addAll(copies.filter { it.outdated }.mapNotNull { it.original })
+        updateQueue.addAll(copies.filter { it.outdated }.mapNotNull { it.original }.map { it to true })
         nextQueued(continueRun = true)
+    }
+
+    /** Makes the copies a restored backup listed, one after another, with their saved choices. */
+    fun addRestorable() {
+        if (job != null) return
+        updateQueue.clear()
+        updateQueue.addAll(restorable.map { it to false })
+        nextQueued(continueRun = true)
+    }
+
+    /** Apps a restored backup listed that are installed here but have no copy yet. */
+    var restorable by mutableStateOf<List<SourceApp>>(emptyList())
+        private set
+
+    fun dismissRestorable() {
+        prefs.edit().remove(RESTORE_PENDING).apply()
+        restorable = emptyList()
     }
 
     private fun nextQueued(continueRun: Boolean) {
@@ -189,7 +214,7 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
         if (!continueRun) updateQueue.clear()
         val next = updateQueue.removeFirstOrNull()
         queued = if (next == null) 0 else updateQueue.size + 1
-        next?.let { add(it, update = true) }
+        next?.let { (app, update) -> add(app, update) }
     }
 
     var pendingAdd by mutableStateOf<AddChoice?>(null)
@@ -256,9 +281,29 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
             }
             catalog = loaded
             backedUp = backed
+            updateRestorable(loaded)
             runPendingUpdate(loaded)
         }
     }
+
+    private fun updateRestorable(catalog: Catalog) {
+        val pending = prefs.getStringSet(RESTORE_PENDING, null).orEmpty()
+        // Made since, so a copy removed later isn't offered again
+        val made = catalog.copies.map { PatchPipeline.originalPackageName(it.packageName) }.toSet()
+        if (pending.any { it in made }) prefs.edit().putStringSet(RESTORE_PENDING, pending - made).apply()
+        restorable = catalog.available.filter { it.info.packageName in pending && it.info.packageName !in made }
+        val inBackup = prefs.getStringSet(BACKUP_COPIES, null)
+        notInBackup = if (inBackup == null) ownCopies(catalog).size else ownCopies(catalog).count { it.originalPackage !in inBackup }
+    }
+
+    /** Copies this CarBridge made, as a backup lists them. */
+    private fun ownCopies(catalog: Catalog): List<BackedUpCopy> = catalog.copies
+        .filter { !it.madeByOtherCarBridge }
+        .map { BackedUpCopy(PatchPipeline.originalPackageName(it.packageName), it.options, it.autoUpdateAllowed) }
+
+    /** Copies a new phone couldn't add back from the latest backup, which predates them. */
+    var notInBackup by mutableStateOf(0)
+        private set
 
     /** Starts true so the backup card doesn't flash before the first load. */
     var backedUp by mutableStateOf(true)
@@ -274,8 +319,9 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
 
     fun startBackup() {
         viewModelScope.launch {
-            withContext(Dispatchers.Default) { runCatching { KeystoreSigner(getApplication()).createBackup() } }
-                .onSuccess { (file, code) -> newBackup = NewBackup(file, code) }
+            val copies = catalog?.let(::ownCopies).orEmpty()
+            withContext(Dispatchers.Default) { runCatching { KeystoreSigner(getApplication()).createBackup(copies) } }
+                .onSuccess { (file, code) -> newBackup = NewBackup(file, code, copies) }
                 .onFailure { e ->
                     Log.e(TAG, "backup failed", e)
                     _messages.send(UserMessage(text(R.string.msg_backup_failed), "${e.javaClass.simpleName}: ${e.message}"))
@@ -300,6 +346,7 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
                 }
             }
             backedUp = saved.isSuccess
+            if (saved.isSuccess) rememberBackedUpCopies(backup.copies)
             _messages.send(
                 if (saved.isSuccess) UserMessage(text(R.string.msg_backed_up))
                 else UserMessage(text(R.string.msg_backup_save_failed), saved.exceptionOrNull()?.message),
@@ -342,9 +389,12 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
                 return@launch
             }
             restoreRequest = null
+            val backup = result.getOrThrow()
+            withContext(Dispatchers.IO) { applyBackedUpCopies(backup.copies) }
             val loaded = withContext(Dispatchers.IO) { AppCatalog.load(context, ::carOptions) }
             catalog = loaded
             backedUp = true
+            updateRestorable(loaded)
             val fixed = lostBefore - loaded.copies.count { it.needsRestore }
             // Restoring this phone's own backup fixes nothing but still covers its copies
             val covered = loaded.copies.count { !it.signedElsewhere }
@@ -352,6 +402,7 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
                 UserMessage(
                     when {
                         fixed > 0 -> getApplication<Application>().resources.getQuantityString(R.plurals.msg_restored_fixed, fixed, fixed)
+                        restorable.isNotEmpty() -> text(R.string.msg_restored_readd)
                         covered > 0 -> text(R.string.msg_restored_covers)
                         else -> text(R.string.msg_restored_new)
                     },
@@ -372,10 +423,35 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
                 return@launch
             }
             restoreRequest = null
-            val works = result.getOrThrow()
-            if (works) backedUp = true
+            val backup = result.getOrThrow()
+            val works = backup != null
+            if (backup != null) {
+                backedUp = true
+                rememberBackedUpCopies(backup.copies)
+                catalog?.let(::updateRestorable)
+            }
             _messages.send(UserMessage(text(if (works) R.string.msg_check_ok else R.string.msg_check_other)))
         }
+    }
+
+    private fun rememberBackedUpCopies(copies: List<BackedUpCopy>) {
+        prefs.edit().putStringSet(BACKUP_COPIES, copies.map { it.originalPackage }.toSet()).apply()
+        catalog?.let(::updateRestorable)
+    }
+
+    /**
+     * Keeps the choices a restored backup saved for each copy, unless this phone already has its
+     * own, and lists the copies to offer making again.
+     */
+    private fun applyBackedUpCopies(copies: List<BackedUpCopy>) {
+        val context = getApplication<Application>()
+        for (copy in copies) {
+            val pkg = copy.originalPackage
+            if (!prefs.contains("keep_portrait:$pkg")) CopyBuilder.save(context, pkg, copy.options)
+            if (!copy.autoUpdate) AutoUpdate.setAllowed(context, pkg, false)
+        }
+        val pending = prefs.getStringSet(RESTORE_PENDING, null).orEmpty() + copies.map { it.originalPackage }
+        prefs.edit().putStringSet(RESTORE_PENDING, pending).putStringSet(BACKUP_COPIES, copies.map { it.originalPackage }.toSet()).apply()
     }
 
     fun cancelRestore() {
