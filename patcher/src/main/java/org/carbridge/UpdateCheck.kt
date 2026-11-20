@@ -67,7 +67,7 @@ object UpdateCheck {
     }
 
     fun run(context: Context) {
-        val prefs = context.getSharedPreferences("setup", 0)
+        val prefs = Prefs.of(context)
         // Only versions not yet announced, so each original update notifies once
         val all = findOutdated(context)
         AutoUpdate.noteOutdated(context, all)
@@ -75,10 +75,10 @@ object UpdateCheck {
         if (automatic.isNotEmpty()) AutoUpdate.schedule(context)
         // Copies the background job will handle don't need the user
         val outdated = all - automatic.toSet()
-        val fresh = outdated.filter { prefs.getLong("notified:${it.originalPackage}", 0) < it.originalCode }
+        val fresh = outdated.filter { prefs.getLong(Prefs.notified(it.originalPackage), 0) < it.originalCode }
         if (fresh.isEmpty()) return
         if (notify(context, outdated)) {
-            prefs.edit().apply { fresh.forEach { putLong("notified:${it.originalPackage}", it.originalCode) } }.apply()
+            prefs.edit().apply { fresh.forEach { putLong(Prefs.notified(it.originalPackage), it.originalCode) } }.apply()
         }
     }
 

@@ -28,7 +28,6 @@ object ShizukuMode {
     const val PACKAGE = "moe.shizuku.privileged.api"
     const val PERMISSION_REQUEST = 7
     const val INSTALL_LOG = "Installing through Shizuku"
-    private const val PREF = "use_shizuku"
 
     fun state(context: Context): State = when {
         Shizuku.pingBinder() -> if (Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) State.Ready else State.NeedsPermission
@@ -37,9 +36,9 @@ object ShizukuMode {
         else -> State.NotRunning
     }
 
-    fun isEnabled(context: Context) = prefs(context).getBoolean(PREF, false)
+    fun isEnabled(context: Context) = prefs(context).getBoolean(Prefs.USE_SHIZUKU, false)
 
-    fun setEnabled(context: Context, on: Boolean) = prefs(context).edit().putBoolean(PREF, on).apply()
+    fun setEnabled(context: Context, on: Boolean) = prefs(context).edit().putBoolean(Prefs.USE_SHIZUKU, on).apply()
 
     fun requestPermission() = Shizuku.requestPermission(PERMISSION_REQUEST)
 
@@ -157,5 +156,5 @@ object ShizukuMode {
         return service ?: throw IOException("its helper didn't start.")
     }
 
-    private fun prefs(context: Context) = context.getSharedPreferences("setup", 0)
+    private fun prefs(context: Context) = Prefs.of(context)
 }

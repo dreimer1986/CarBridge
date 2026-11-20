@@ -35,19 +35,19 @@ object AutoUpdate {
     /** After this long without charging, the user gets the manual update notice instead. */
     val MAX_WAIT_MS = TimeUnit.DAYS.toMillis(2)
 
-    private fun prefs(context: Context) = context.getSharedPreferences("setup", 0)
+    private fun prefs(context: Context) = Prefs.of(context)
 
-    fun isEnabled(context: Context) = prefs(context).getBoolean("auto_update", false)
+    fun isEnabled(context: Context) = prefs(context).getBoolean(Prefs.AUTO_UPDATE, false)
 
     fun setEnabled(context: Context, on: Boolean) {
-        prefs(context).edit().putBoolean("auto_update", on).apply()
+        prefs(context).edit().putBoolean(Prefs.AUTO_UPDATE, on).apply()
         if (on) schedule(context)
     }
 
-    fun isAllowed(context: Context, originalPackage: String) = !prefs(context).getBoolean("auto_update_off:$originalPackage", false)
+    fun isAllowed(context: Context, originalPackage: String) = !prefs(context).getBoolean(Prefs.autoUpdateOff(originalPackage), false)
 
     fun setAllowed(context: Context, originalPackage: String, allowed: Boolean) {
-        prefs(context).edit().putBoolean("auto_update_off:$originalPackage", !allowed).apply()
+        prefs(context).edit().putBoolean(Prefs.autoUpdateOff(originalPackage), !allowed).apply()
     }
 
     /**
@@ -59,9 +59,9 @@ object AutoUpdate {
         val prefs = prefs(context)
         val now = System.currentTimeMillis()
         return outdated.filter { o ->
-            val since = prefs.getLong("outdated_since:${o.originalPackage}:${o.originalCode}", now)
+            val since = prefs.getLong(Prefs.outdatedSince(o.originalPackage, o.originalCode), now)
             isAllowed(context, o.originalPackage) &&
-                prefs.getLong("auto_tried:${o.originalPackage}", 0) < o.originalCode &&
+                prefs.getLong(Prefs.autoTried(o.originalPackage), 0) < o.originalCode &&
                 now - since < MAX_WAIT_MS
         }
     }
@@ -71,7 +71,7 @@ object AutoUpdate {
         val prefs = prefs(context)
         val edit = prefs.edit()
         for (o in outdated) {
-            val key = "outdated_since:${o.originalPackage}:${o.originalCode}"
+            val key = Prefs.outdatedSince(o.originalPackage, o.originalCode)
             if (!prefs.contains(key)) edit.putLong(key, System.currentTimeMillis())
         }
         edit.apply()
@@ -94,7 +94,7 @@ object AutoUpdate {
         val app = runCatching { context.packageManager.getApplicationInfo(next.originalPackage, 0) }.getOrNull() ?: return false
         // The user is building a copy; try again on the next run without counting this one
         if (CopyBuilder.building.value != null) return true
-        prefs(context).edit().putLong("auto_tried:${next.originalPackage}", next.originalCode).apply()
+        prefs(context).edit().putLong(Prefs.autoTried(next.originalPackage), next.originalCode).apply()
         try {
             if (!CopyBuilder.build(context, app, log = { Log.i(TAG, it) }, background = true)) return true
         } catch (e: Throwable) {
@@ -110,7 +110,7 @@ object AutoUpdate {
         val flag = File(context.filesDir, "force-auto-update")
         if (!flag.exists()) return false
         flag.delete()
-        prefs(context).all.keys.filter { it.startsWith("auto_tried:") }.forEach { prefs(context).edit().remove(it).apply() }
+        prefs(context).all.keys.filter { it.startsWith(Prefs.AUTO_TRIED) }.forEach { prefs(context).edit().remove(it).apply() }
         return true
     }
 

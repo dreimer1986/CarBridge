@@ -129,7 +129,7 @@ object AppCatalog {
                 hasMediaService = original != null && hasMediaService(pm, originalPkg),
                 options = options(originalPkg),
                 autoUpdateAllowed = AutoUpdate.isAllowed(context, originalPkg),
-                fromFile = original == null && context.getSharedPreferences("setup", 0).getBoolean("from_file:$originalPkg", false),
+                fromFile = original == null && Prefs.of(context).getBoolean(Prefs.fromFile(originalPkg), false),
                 signedElsewhere = !signer.canUpdate(pm, info.packageName),
                 carProblem = carProblem(pm, info.packageName),
                 madeByOtherCarBridge = installer(pm, info.packageName).let { by ->

@@ -34,12 +34,6 @@ import org.carbridge.patch.PatchPipeline
 
 private const val TAG = "CarBridge"
 
-// Original packages a restored backup listed, until their copies are made or the offer dismissed
-private const val RESTORE_PENDING = "restore_pending"
-
-// Original packages the latest saved or checked backup lists
-private const val BACKUP_COPIES = "backup_copies"
-
 /** A car copy being made; [step] indexes [JobStep]. */
 data class Job(
     val label: String,
@@ -91,7 +85,7 @@ class NewBackup(val file: ByteArray, val code: String, val copies: List<BackedUp
 class RestoreRequest(val file: ByteArray, val checkOnly: Boolean = false, val error: String? = null, val working: Boolean = false)
 
 class HomeModel(app: Application) : AndroidViewModel(app) {
-    private val prefs = app.getSharedPreferences("setup", 0)
+    private val prefs = Prefs.of(app)
 
     var catalog by mutableStateOf<Catalog?>(null)
         private set
@@ -99,7 +93,7 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
         private set
     var setup by mutableStateOf(readSetup())
         private set
-    var showAutoApps by mutableStateOf(prefs.getBoolean("show_auto_apps", false))
+    var showAutoApps by mutableStateOf(prefs.getBoolean(Prefs.SHOW_AUTO_APPS, false))
         private set
     var autoUpdate by mutableStateOf(AutoUpdate.isEnabled(app))
         private set
@@ -167,8 +161,8 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
                 val current = job
                 if (current != null && (result.packageName ?: current.packageName) == current.packageName) {
                     job = null
-                    if (result.success && !prefs.getBoolean("asked_notifications", false)) {
-                        prefs.edit().putBoolean("asked_notifications", true).apply()
+                    if (result.success && !prefs.getBoolean(Prefs.ASKED_NOTIFICATIONS, false)) {
+                        prefs.edit().putBoolean(Prefs.ASKED_NOTIFICATIONS, true).apply()
                         _notificationPrompt.send(Unit)
                     }
                     // Checked after installing, so the user hears now rather than in the car
@@ -209,7 +203,7 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
         private set
 
     fun dismissRestorable() {
-        prefs.edit().remove(RESTORE_PENDING).apply()
+        prefs.edit().remove(Prefs.RESTORE_PENDING).apply()
         restorable = emptyList()
     }
 
@@ -283,6 +277,7 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
             val (loaded, backed) = withContext(Dispatchers.IO) {
                 val start = SystemClock.elapsedRealtime()
                 val loaded = AppCatalog.load(getApplication(), ::carOptions)
+                Prefs.prune(getApplication(), loaded.copies.associate { PatchPipeline.originalPackageName(it.packageName) to (it.version?.code ?: 0L) })
                 Log.i(TAG, "Catalog: ${loaded.copies.size + loaded.available.size} apps in ${SystemClock.elapsedRealtime() - start} ms")
                 loaded to KeystoreSigner(getApplication()).hasBackup()
             }
@@ -294,12 +289,12 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun updateRestorable(catalog: Catalog) {
-        val pending = prefs.getStringSet(RESTORE_PENDING, null).orEmpty()
+        val pending = prefs.getStringSet(Prefs.RESTORE_PENDING, null).orEmpty()
         // Made since, so a copy removed later isn't offered again
         val made = catalog.copies.map { PatchPipeline.originalPackageName(it.packageName) }.toSet()
-        if (pending.any { it in made }) prefs.edit().putStringSet(RESTORE_PENDING, pending - made).apply()
+        if (pending.any { it in made }) prefs.edit().putStringSet(Prefs.RESTORE_PENDING, pending - made).apply()
         restorable = catalog.available.filter { it.info.packageName in pending && it.info.packageName !in made }
-        val inBackup = prefs.getStringSet(BACKUP_COPIES, null)
+        val inBackup = prefs.getStringSet(Prefs.BACKUP_COPIES, null)
         notInBackup = if (inBackup == null) ownCopies(catalog).size else ownCopies(catalog).count { it.originalPackage !in inBackup }
     }
 
@@ -315,7 +310,7 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
     /** Starts true so the backup card doesn't flash before the first load. */
     var backedUp by mutableStateOf(true)
         private set
-    var restoreDeclined by mutableStateOf(prefs.getBoolean("restore_declined", false))
+    var restoreDeclined by mutableStateOf(prefs.getBoolean(Prefs.RESTORE_DECLINED, false))
         private set
     var newBackup by mutableStateOf<NewBackup?>(null)
         private set
@@ -442,7 +437,7 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun rememberBackedUpCopies(copies: List<BackedUpCopy>) {
-        prefs.edit().putStringSet(BACKUP_COPIES, copies.map { it.originalPackage }.toSet()).apply()
+        prefs.edit().putStringSet(Prefs.BACKUP_COPIES, copies.map { it.originalPackage }.toSet()).apply()
         catalog?.let(::updateRestorable)
     }
 
@@ -454,11 +449,11 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
         val context = getApplication<Application>()
         for (copy in copies) {
             val pkg = copy.originalPackage
-            if (!prefs.contains("keep_portrait:$pkg")) CopyBuilder.save(context, pkg, copy.options)
+            if (!prefs.contains(Prefs.keepPortrait(pkg))) CopyBuilder.save(context, pkg, copy.options)
             if (!copy.autoUpdate) AutoUpdate.setAllowed(context, pkg, false)
         }
-        val pending = prefs.getStringSet(RESTORE_PENDING, null).orEmpty() + copies.map { it.originalPackage }
-        prefs.edit().putStringSet(RESTORE_PENDING, pending).putStringSet(BACKUP_COPIES, copies.map { it.originalPackage }.toSet()).apply()
+        val pending = prefs.getStringSet(Prefs.RESTORE_PENDING, null).orEmpty() + copies.map { it.originalPackage }
+        prefs.edit().putStringSet(Prefs.RESTORE_PENDING, pending).putStringSet(Prefs.BACKUP_COPIES, copies.map { it.originalPackage }.toSet()).apply()
     }
 
     fun cancelRestore() {
@@ -467,7 +462,7 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
 
     /** The user has no backup, so stop offering a restore for copies signed with a lost key. */
     fun declineRestore() {
-        prefs.edit().putBoolean("restore_declined", true).apply()
+        prefs.edit().putBoolean(Prefs.RESTORE_DECLINED, true).apply()
         restoreDeclined = true
     }
 
@@ -495,7 +490,7 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
 
     fun toggleAutoApps() {
         showAutoApps = !showAutoApps
-        prefs.edit().putBoolean("show_auto_apps", showAutoApps).apply()
+        prefs.edit().putBoolean(Prefs.SHOW_AUTO_APPS, showAutoApps).apply()
     }
 
     private fun carOptions(originalPackage: String) = CopyBuilder.options(getApplication(), originalPackage)
@@ -503,26 +498,26 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
     /** Saves the layout choice and rebuilds the copy with it. */
     fun setFillScreen(copy: CarCopy, fill: Boolean) {
         val original = copy.original ?: return
-        prefs.edit().putBoolean("keep_portrait:${original.info.packageName}", !fill).apply()
+        prefs.edit().putBoolean(Prefs.keepPortrait(original.info.packageName), !fill).apply()
         add(original, update = true)
     }
 
     /** Saves the audio-player choice and rebuilds the copy with it. */
     fun setKeepMedia(copy: CarCopy, keep: Boolean) {
         val original = copy.original ?: return
-        prefs.edit().putBoolean("keep_media:${original.info.packageName}", keep).apply()
+        prefs.edit().putBoolean(Prefs.keepMedia(original.info.packageName), keep).apply()
         add(original, update = true)
     }
 
     /** Saves whether the copy shows in the phone's app list and rebuilds it with that. */
     fun setHideOnPhone(copy: CarCopy, hide: Boolean) {
         val original = copy.original ?: return
-        prefs.edit().putBoolean("hide_on_phone:${original.info.packageName}", hide).apply()
+        prefs.edit().putBoolean(Prefs.hideOnPhone(original.info.packageName), hide).apply()
         add(original, update = true)
     }
 
-    fun markDeveloperMode() = mark("developer_mode")
-    fun markUnknownSources() = mark("unknown_sources")
+    fun markDeveloperMode() = mark(Prefs.DEVELOPER_MODE)
+    fun markUnknownSources() = mark(Prefs.UNKNOWN_SOURCES)
 
     private fun mark(key: String) {
         prefs.edit().putBoolean(key, true).apply()
@@ -531,8 +526,8 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
 
     private fun readSetup() = Setup(
         canInstall = getApplication<Application>().packageManager.canRequestPackageInstalls(),
-        developerMode = prefs.getBoolean("developer_mode", false),
-        unknownSources = prefs.getBoolean("unknown_sources", false),
+        developerMode = prefs.getBoolean(Prefs.DEVELOPER_MODE, false),
+        unknownSources = prefs.getBoolean(Prefs.UNKNOWN_SOURCES, false),
     )
 
     fun add(source: SourceApp, update: Boolean) {
@@ -582,7 +577,7 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
             }
             val (info, label, icon) = read.getOrNull() ?: return@launch
             val installed = runCatching { context.packageManager.getPackageInfo(info.packageName, 0) }.isSuccess
-            if (!installed) prefs.edit().putBoolean("from_file:${info.packageName}", true).apply()
+            if (!installed) prefs.edit().putBoolean(Prefs.fromFile(info.packageName), true).apply()
             val carPackage = PatchPipeline.carPackageName(info.packageName)
             val update = runCatching { context.packageManager.getPackageInfo(carPackage, 0) }.isSuccess
             build(label, icon, info, update) { ApkImport.workDir(context.cacheDir).deleteRecursively() }
