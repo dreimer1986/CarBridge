@@ -29,6 +29,16 @@ object Installer {
             setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED)
         }
         val sessionId = installer.createSession(params)
+        try {
+            write(installer, sessionId, apks, context, packageName, background)
+        } catch (e: Throwable) {
+            // Otherwise the session and its staged APKs stay behind until Android expires them
+            runCatching { installer.abandonSession(sessionId) }
+            throw e
+        }
+    }
+
+    private fun write(installer: PackageInstaller, sessionId: Int, apks: List<File>, context: Context, packageName: String, background: Boolean) {
         installer.openSession(sessionId).use { session ->
             for (apk in apks) {
                 session.openWrite(apk.name, 0, apk.length()).use { out ->
