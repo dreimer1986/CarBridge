@@ -4,6 +4,8 @@ What changed in each CarBridge release. Dev pre-releases show the Unreleased sec
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-11-20
+
 - The app's font is built in, so it no longer needs Google Play Services or a download
 - A Back to top button appears once you've scrolled down the app list
 - Tapping the app search scrolls it to the top of the screen, so the results aren't hidden behind the keyboard
