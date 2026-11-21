@@ -95,6 +95,7 @@ class ScreenshotActivity : ComponentActivity() {
             portraitLocked = portrait,
             hasMediaService = false,
             options = CarOptions(),
+            sizeBytes = original.sizeBytes,
         )
 
     private fun icon(letter: String, color: Long, badged: Boolean): ImageBitmap {

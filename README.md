@@ -267,8 +267,10 @@ gh secret set CARBRIDGE_STORE_PASSWORD && gh secret set CARBRIDGE_KEY_ALIAS && g
 ```
 
 Store listing text, icon and screenshots for IzzyOnDroid and F-Droid clients are in
-`fastlane/metadata/android/en-US`. The screenshot uses made-up sample apps from a debug-only
-screen (`patcher/src/debug`); crop the status and navigation bars off the capture:
+`fastlane/metadata/android/en-US`. The screenshots use made-up sample apps from a debug-only
+screen (`patcher/src/debug`); crop the status and navigation bars off each capture. Add
+`--ef progress 0.45` for the progress bar; open the ⋮ menu and Settings by tapping. Set the debug
+`app_name` to "CarBridge" while capturing, so the header doesn't say "CarBridge Debug":
 
 ```bash
 ./gradlew :patcher:installDebug && adb shell am start -n org.carbridge.debug/org.carbridge.ScreenshotActivity
