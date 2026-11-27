@@ -48,7 +48,7 @@ import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Refresh
-import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -526,7 +526,7 @@ private fun CarSign(
                         if (copy.original != null) {
                             DropdownMenuItem(
                                 text = { Text(if (copy.options.markOptimized) "Preserve original declarations" else "Set distractionOptimized metadata") },
-                                leadingIcon = { Icon(Icons.Rounded.Settings, contentDescription = null) },
+                                leadingIcon = { Icon(Icons.Rounded.Edit, contentDescription = null) },
                                 onClick = { menu = false; onMarkOptimized(!copy.options.markOptimized) },
                             )
                         }
