@@ -6,6 +6,7 @@ data class CarOptions(
     val keepMediaServices: Boolean = false,
     /** Drop portrait-only locks, so the app fills the landscape car display. */
     val fillScreen: Boolean = true,
+    val markOptimized: Boolean = true,
 )
 
 /**
@@ -51,7 +52,7 @@ object CarPatch {
 
     fun apply(host: ManifestHost, options: CarOptions = CarOptions()) {
         val app = host.application
-        addCarEntries(host, app)
+        addCarEntries(host, app, options.markOptimized)
         val stripped = if (options.keepMediaServices) setOf(CAR_APP_SERVICE_ACTION) else MEDIA_SERVICE_ACTIONS + CAR_APP_SERVICE_ACTION
         stripTemplateServices(host, app, stripped)
         if (options.fillScreen) unlockPortrait(host, app)
@@ -61,9 +62,9 @@ object CarPatch {
         (app.children("activity") + app.children("activity-alias"))
             .filter { a -> a.children("intent-filter").any(::isLauncherFilter) }
 
-    private fun addCarEntries(host: ManifestHost, app: ManifestElement) {
+    private fun addCarEntries(host: ManifestHost, app: ManifestElement, markOptimized: Boolean) {
         app.setEnum(APP_CATEGORY, "game")
-        ensureMeta(app, "distractionOptimized") { it.setBoolean(VALUE, true) }
+        if (markOptimized) ensureMeta(app, "distractionOptimized") { it.setBoolean(VALUE, true) }
         ensureMeta(app, "androidx.car.app.minCarApiLevel") { it.setInt(VALUE, 7) }
         if (findMeta(app, CAR_APP_META) == null) {
             host.addAutomotiveDescriptor(DESCRIPTOR_NAME, "media")
@@ -80,7 +81,7 @@ object CarPatch {
                 if (!isLauncherFilter(filter)) continue
                 val existing = filter.children("category").mapNotNull { it.getString(NAME) }.toSet()
                 for (cat in CAR_CATEGORIES - existing) filter.append("category").setString(NAME, cat)
-                ensureMeta(activity, "distractionOptimized") { it.setBoolean(VALUE, true) }
+                if (markOptimized) ensureMeta(activity, "distractionOptimized") { it.setBoolean(VALUE, true) }
                 activity.setBoolean(RESIZEABLE, true)
                 activity.getString(NAME)?.let(patched::add)
             }

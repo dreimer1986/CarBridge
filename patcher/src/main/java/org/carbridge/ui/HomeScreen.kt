@@ -48,6 +48,7 @@ import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -115,6 +116,7 @@ class HomeActions(
     val updateAll: (List<CarCopy>) -> Unit,
     val openMorphe: () -> Unit,
     val setFillScreen: (CarCopy, Boolean) -> Unit,
+    val setMarkOptimized: (CarCopy, Boolean) -> Unit,
     val setKeepMedia: (CarCopy, Boolean) -> Unit,
     val remove: (CarCopy) -> Unit,
 )
@@ -194,6 +196,7 @@ fun HomeScreen(model: HomeModel, actions: HomeActions) {
                             onUpdate = { actions.update(copy) },
                             onRemove = { actions.remove(copy) },
                             onFillScreen = { fill -> actions.setFillScreen(copy, fill) },
+                            onMarkOptimized = { actions.setMarkOptimized(copy, it) },
                             onKeepMedia = { keep -> actions.setKeepMedia(copy, keep) },
                         )
                     }
@@ -467,6 +470,7 @@ private fun CarSign(
     onUpdate: () -> Unit,
     onRemove: () -> Unit,
     onFillScreen: (Boolean) -> Unit,
+    onMarkOptimized: (Boolean) -> Unit,
     onKeepMedia: (Boolean) -> Unit,
 ) {
     val signs = LocalSigns.current
@@ -517,6 +521,13 @@ private fun CarSign(
                                 text = { Text(if (copy.options.fillScreen) "Keep portrait layout" else "Fill the car screen") },
                                 leadingIcon = { Icon(LandscapeGlyph, contentDescription = null) },
                                 onClick = { menu = false; onFillScreen(!copy.options.fillScreen) },
+                            )
+                        }
+                        if (copy.original != null) {
+                            DropdownMenuItem(
+                                text = { Text(if (copy.options.markOptimized) "Preserve original declarations" else "Set distractionOptimized metadata") },
+                                leadingIcon = { Icon(Icons.Rounded.Settings, contentDescription = null) },
+                                onClick = { menu = false; onMarkOptimized(!copy.options.markOptimized) },
                             )
                         }
                         if (copy.original != null && copy.hasMediaService) {
@@ -659,6 +670,7 @@ private fun UpdateAllRow(count: Int, enabled: Boolean, onClick: () -> Unit) {
 
 @Composable
 private fun AddChoiceDialog(choice: AddChoice, onConfirm: (CarOptions) -> Unit, onDismiss: () -> Unit) {
+    var optimized by rememberSaveable { mutableStateOf(true) }
     var fill by rememberSaveable { mutableStateOf(true) }
     var player by rememberSaveable { mutableStateOf(false) }
     AlertDialog(
@@ -671,6 +683,7 @@ private fun AddChoiceDialog(choice: AddChoice, onConfirm: (CarOptions) -> Unit, 
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                ChoiceRow("Set distractionOptimized metadata", "Turn off to preserve the app’s original declarations.", optimized) { optimized = it }
                 if (choice.portraitLocked) {
                     ChoiceRow(
                         "Fill the car screen",
@@ -688,7 +701,7 @@ private fun AddChoiceDialog(choice: AddChoice, onConfirm: (CarOptions) -> Unit, 
             }
         },
         confirmButton = {
-            TextButton(onClick = { onConfirm(CarOptions(keepMediaServices = player, fillScreen = fill)) }) {
+            TextButton(onClick = { onConfirm(CarOptions(keepMediaServices = player, fillScreen = fill, markOptimized = optimized)) }) {
                 Text("Add to car")
             }
         },

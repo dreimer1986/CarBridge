@@ -39,6 +39,7 @@ class MainActivity : ComponentActivity() {
             updateAll = model::updateAll,
             openMorphe = { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(MORPHE_SOURCE))) },
             setFillScreen = model::setFillScreen,
+            setMarkOptimized = model::setMarkOptimized,
             setKeepMedia = model::setKeepMedia,
             remove = { copy -> startActivity(Intent(Intent.ACTION_DELETE, Uri.parse("package:${copy.packageName}"))) },
         )

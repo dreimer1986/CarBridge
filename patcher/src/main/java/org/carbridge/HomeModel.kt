@@ -114,7 +114,7 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
             val (portrait, media) = withContext(Dispatchers.IO) {
                 AppCatalog.traits(getApplication(), app.info.packageName)
             }
-            if (portrait || media) pendingAdd = AddChoice(app, portrait, media) else add(app, update = false)
+            pendingAdd = AddChoice(app, portrait, media)
         }
     }
 
@@ -123,6 +123,7 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
         prefs.edit()
             .putBoolean("keep_portrait:$pkg", !options.fillScreen)
             .putBoolean("keep_media:$pkg", options.keepMediaServices)
+            .putBoolean("mark_optimized:$pkg", options.markOptimized)
             .apply()
         pendingAdd = null
         add(choice.app, update = false)
@@ -179,6 +180,7 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
 
     /** Per-app choices; by default copies fill the screen and drop media services. */
     private fun carOptions(originalPackage: String) = CarOptions(
+        markOptimized = prefs.getBoolean("mark_optimized:$originalPackage", true),
         keepMediaServices = prefs.getBoolean("keep_media:$originalPackage", false),
         fillScreen = !prefs.getBoolean("keep_portrait:$originalPackage", false),
     )
@@ -187,6 +189,12 @@ class HomeModel(app: Application) : AndroidViewModel(app) {
     fun setFillScreen(copy: CarCopy, fill: Boolean) {
         val original = copy.original ?: return
         prefs.edit().putBoolean("keep_portrait:${original.info.packageName}", !fill).apply()
+        add(original, update = true)
+    }
+
+    fun setMarkOptimized(copy: CarCopy, enabled: Boolean) {
+        val original = copy.original ?: return
+        prefs.edit().putBoolean("mark_optimized:${original.info.packageName}", enabled).apply()
         add(original, update = true)
     }
 
